@@ -1,0 +1,142 @@
+{
+  "about": "Reviewed, pinned copies installed by `narvai.mjs install` from third-party/ (no network at install time). Updating: clone the source at a new commit, read what changed (scripts, network calls, hooks), copy only the listed skills over third-party/skills, re-apply the local changes, update the commit here.",
+  "skillLibrary": "~/.claude/skills",
+  "sources": [
+    {
+      "repo": "dotnet/skills",
+      "commit": "96c3d68",
+      "skills": [
+        "csharp-expert",
+        "csharp-refactoring",
+        "optimizing-ef-core-queries",
+        "dotnet-webapi",
+        "test-gap-analysis",
+        "test-anti-patterns",
+        "assertion-quality",
+        "find-untested-sources",
+        "binlog-failure-analysis",
+        "binlog-generation",
+        "build-perf-diagnostics",
+        "analyzing-dotnet-performance",
+        "dotnet-trace-collect",
+        "convert-to-cpm"
+      ]
+    },
+    {
+      "repo": "vercel-labs/agent-skills",
+      "commit": "1a2c79d",
+      "skills": [
+        "vercel-react-best-practices",
+        "vercel-composition-patterns",
+        "web-design-guidelines"
+      ],
+      "localChanges": [
+        "web-design-guidelines reads guidelines.md (vercel-labs/web-interface-guidelines @ 434b7f9) instead of fetching it at run time"
+      ]
+    },
+    {
+      "repo": "supabase/agent-skills",
+      "commit": "c9be0e9",
+      "skills": [
+        "supabase-postgres-best-practices"
+      ]
+    },
+    {
+      "repo": "trailofbits/skills",
+      "commit": "e4dd0bb",
+      "skills": [
+        "differential-review",
+        "sharp-edges",
+        "supply-chain-risk-auditor",
+        "semgrep",
+        "sarif-parsing",
+        "codeql",
+        "mutation-testing"
+      ],
+      "agents": [
+        "adversarial-modeler",
+        "sharp-edges-analyzer"
+      ],
+      "localChanges": [
+        "differential-review dispatches adversarial-modeler by its plain name (no plugin namespace)"
+      ]
+    },
+    {
+      "repo": "microsoft/playwright-cli",
+      "commit": "9c95a50",
+      "skills": [
+        "playwright-cli"
+      ],
+      "manual": [
+        "npm install -g @playwright/cli@0.1.24"
+      ],
+      "done": "which:playwright-cli"
+    },
+    {
+      "repo": "Egonex-AI/Understand-Anything",
+      "commit": "182c7fb",
+      "skills": [
+        "understand",
+        "understand-chat",
+        "understand-explain",
+        "understand-onboard",
+        "understand-diff",
+        "understand-domain",
+        "understand-dashboard",
+        "understand-figma",
+        "understand-knowledge"
+      ],
+      "manual": [
+        "git clone https://github.com/Egonex-AI/Understand-Anything ~/.understand-anything-plugin && git -C ~/.understand-anything-plugin checkout 182c7fb, then build its core (see KURULUM-NOTU.txt there); its own hooks are not installed"
+      ],
+      "done": "path:~/.understand-anything-plugin"
+    },
+    {
+      "repo": "pbakaus/impeccable",
+      "commit": "ec229b4",
+      "skills": [
+        "impeccable"
+      ],
+      "localChanges": [
+        "SKILL.md and reference/ only: no launcher, detector engine, hooks or plugin agents; a 'Local install' block at the top points it at the project profile"
+      ]
+    },
+    {
+      "repo": "unknown (vendored as found, 2026-11-11)",
+      "commit": "-",
+      "skills": [
+        "karpathy-guidelines"
+      ]
+    }
+  ],
+  "plugins": {
+    "about": "Claude Code plugins narvai routes to (agent-skills from addy-agent-skills, LSP from claude-plugins-official); install with /plugin, not vendored.",
+    "names": [
+      "agent-skills",
+      "pstack",
+      "ponytail",
+      "mattpocock-skills",
+      "csharp-lsp",
+      "typescript-lsp"
+    ]
+  },
+  "tools": {
+    "about": "Checked by `narvai.mjs doctor`; installed by hand when a skill needs them (Heavy Mode tools ask first).",
+    "required": [
+      "node",
+      "git"
+    ],
+    "recommended": [
+      "dotnet",
+      "pnpm",
+      "csharp-ls",
+      "typescript-language-server",
+      "lefthook"
+    ],
+    "heavy": [
+      "semgrep",
+      "codeql",
+      "playwright-cli"
+    ]
+  }
+}
