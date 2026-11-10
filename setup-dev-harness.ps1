@@ -214,30 +214,11 @@ function Set-RtkHookState([string]$state) {
 }
 
 function Set-StoreHookState([string]$state) {
-    Write-Head "AI store SessionStart hook -> $state"
-    $settings = Join-Path $ClaudeHome 'settings.json'
-    $hookCmd = (Join-Path $PSScriptRoot 'hooks\ai-store-context.cmd').Replace('\', '/') + ' SessionStart || echo {}'
-    $json = Get-Content $settings -Raw | ConvertFrom-Json
-    $present = ((Get-Content $settings -Raw) -match 'ai-store-context')
-
-    if ($state -eq 'On') {
-        if ($present) { Ok 'already registered'; return }
-        Backup-File $settings | Out-Null
-        $entry = [pscustomobject]@{ hooks = @([pscustomobject]@{ type = 'command'; command = $hookCmd; timeout = 10 }) }
-        $json.hooks.SessionStart = @(@($json.hooks.SessionStart) + $entry)
-        $json | ConvertTo-Json -Depth 20 | Set-Content $settings -Encoding utf8
-        Ok 'registered alongside the existing SessionStart hooks (Orca untouched)'
-        Warn 'restart the session for it to take effect'
-    } else {
-        if (-not $present) { Ok 'not registered'; return }
-        Backup-File $settings | Out-Null
-        $json.hooks.SessionStart = @(@($json.hooks.SessionStart) | Where-Object { $_.hooks[0].command -notmatch 'ai-store-context' })
-        $json | ConvertTo-Json -Depth 20 | Set-Content $settings -Encoding utf8
-        Ok 'removed; other SessionStart hooks left in place'
-    }
+    Write-Head 'AI store hook'
+    Info 'Claude hooks (store context, guard, graph) are registered by: node narvai.mjs install'
+    & node (Join-Path $PSScriptRoot 'narvai.mjs') install
 }
 
-# Skill sync, Pi rules and the Codex/Qwen pointer live in narvai.mjs (node, any OS); this wrapper only calls it.
 function Sync-Orchestrator {
     Write-Head 'narvai sync (node narvai.mjs sync)'
     & node (Join-Path $PSScriptRoot 'narvai.mjs') sync
@@ -413,7 +394,7 @@ function Show-Health {
     if ($raw -match '"superpowers@claude-plugins-official":\s*false') { Ok 'Superpowers: installed, off default route' } else { Warn 'Superpowers: ON the default route (expected off)' }
     if ($raw -match 'rtk') { Warn 'settings.json mentions rtk - transparent hook may be installed' } else { Ok 'RTK: explicit mode, Orca hooks untouched' }
     if ($raw -match '"agent-skills@addy-agent-skills":\s*true') { Ok 'Addy agent-skills: enabled' } else { Warn 'Addy agent-skills: disabled (expected enabled)' }
-    if ($raw -match 'ai-store-context') { Ok 'AI store hook: registered (store activates on session start)' } else { Warn 'AI store hook: not registered - run -StoreHook On' }
+    if ($raw -match 'store-context') { Ok 'AI store hook: registered (store activates on session start)' } else { Warn 'AI store hook: not registered - run -StoreHook On' }
     Write-Head 'Shared skill'
     Info "source: $SkillSrc"
     foreach ($p in @((Join-Path $ClaudeHome "skills\$SkillName"), (Join-Path $CodexHome "skills\$SkillName"), (Join-Path $PiHome "skills\$SkillName"))) {

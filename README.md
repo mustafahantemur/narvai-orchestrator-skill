@@ -10,7 +10,7 @@ ajanın doğru SDLC ile çalışmasını sağlar: isteğin niyetini okuyup doğr
 Önkoşul: node 22+ ve git.
 
 ```
-git clone <bu repo> narvai && cd narvai
+git clone https://github.com/<kullanıcı>/narvai-orchestrator-skill.git narvai && cd narvai
 node narvai.mjs install    # config, skill kopyaları, üçüncü parti skill'ler, Claude hook'ları
 node narvai.mjs doctor     # ne kurulu, ne eksik
 ```

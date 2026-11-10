@@ -107,7 +107,7 @@ cd C:\Users\SS\Documents\dev-harness
 .\setup-dev-harness.ps1 -Check              # her şey yerinde mi (varsayılan)
 .\setup-dev-harness.ps1 -Update             # eksikleri kur, skill'leri senkronla
 .\setup-dev-harness.ps1 -Repair             # bozulmuş ayarları düzelt
-.\setup-dev-harness.ps1 -Sync               # orchestrator'ı Codex ve Pi'ye kopyala
+node narvai.mjs sync                         # narvai skill: Claude, Codex, Pi (ps1 -Sync da bunu çağırır)
 .\setup-dev-harness.ps1 -Project <repo>     # repo için dış store aç
 .\setup-dev-harness.ps1 -Where   <repo>     # store yolunu yazdır
 .\setup-dev-harness.ps1 -Graph   <repo>     # code graph üret, store'a taşı, repo'yu temiz bırak
