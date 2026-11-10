@@ -23,7 +23,7 @@
       "prompt": "bildirim tercihleri icin yeni bir ayar sayfasi tasarla, kod yazmadan once planini goster",
       "why": "UI checkpoint: design skill, archetype, states and the narrow-phone layout in the plan.",
       "skillsAny": ["omnimind-ui", "impeccable"],
-      "textAll": ["344", "arketip|archetype|sayfa tipi", "bos durum|boş durum|empty"]
+      "textAll": ["344", "arketip|archetype|sayfa tipi|sayfa düzeni|sayfa duzeni", "bos durum|boş durum|empty"]
     },
     {
       "id": "explain-flow",

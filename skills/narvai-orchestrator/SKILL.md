@@ -15,6 +15,15 @@ users type fast, with typos and sometimes without diacritics. Then pick skills b
 `references/intent-routing.md`. Every skill you invoke is named to the user in one line with the reason, and the
 final answer of the turn ends with one line listing the skills used (narvai-orchestrator included).
 
+**Required skill calls.** For each line that fits the request, call the Skill tool right after this skill and
+before reading code for it. Naming a skill or "following its flow" without calling it does not count.
+- UI work, a plan for it included (page, dialog, form, component, layout): the design skill named in the project
+  profile's `## UI` (read the profile first), then `impeccable`.
+- A bug, a failure or a wrong value: `mattpocock-skills:diagnosing-bugs`.
+- About to write code: `karpathy-guidelines`.
+
+The other checkpoints are in §3b.
+
 ## 1. Classify before anything else
 
 Is there an active work item for this branch/worktree?

@@ -123,8 +123,9 @@ function judge(sc, run) {
   }
   if ((sc.toolsNone ?? []).some((t) => ['Edit', 'Write', 'NotebookEdit'].includes(t))) add('no write outside the plan file', !repoWrites.length, repoWrites.join(', '));
   for (const b of sc.bashNone ?? []) { const hit = run.commands.find((c) => rx(b).test(c)); add(`no command /${b}/`, !hit, hit ?? ''); }
-  for (const p of sc.textAll ?? []) add(`text /${p}/`, rx(p).test(run.text));
-  if (sc.textAny?.length) add(`text any of ${sc.textAny.length}`, sc.textAny.some((p) => rx(p).test(run.text)));
+  const seen = `${run.allText ?? ''}\n${run.text}`;
+  for (const p of sc.textAll ?? []) add(`text /${p}/`, rx(p).test(seen));
+  if (sc.textAny?.length) add(`text any of ${sc.textAny.length}`, sc.textAny.some((p) => rx(p).test(seen)));
   const unnamed = [...new Set(run.skills)].filter((s) => s && !(run.allText + run.text).toLowerCase().includes(s.split(':').at(-1).toLowerCase()));
   add('names the skills it used', unnamed.length === 0, unnamed.join(', '));
   if (run.error) add('run finished', false, run.error);
