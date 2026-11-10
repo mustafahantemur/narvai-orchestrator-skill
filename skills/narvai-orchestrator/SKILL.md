@@ -21,6 +21,8 @@ before reading code for it. Naming a skill or "following its flow" without calli
   profile's `## UI` (read the profile first), then `impeccable`.
 - A bug, a failure or a wrong value: `mattpocock-skills:diagnosing-bugs`.
 - About to write code: `karpathy-guidelines`.
+- An endpoint, DTO, enum or error code changes: read `references/delivery.md`; the plan names all four steps:
+  backend first, regenerate the client types, drift check against the schema URL, two PRs in one merge window.
 
 The other checkpoints are in §3b.
 
