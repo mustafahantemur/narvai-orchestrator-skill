@@ -51,5 +51,7 @@ export default async function run(args) {
     return findSkill(index, name) ?? { name };
   };
   const lines = [...skillLines(routes, event, paths, resolveSkill), ...(CHECKPOINTS[event] ?? [])];
+  const byPath = routes.filter((r) => r.when?.event === event && r.when.paths).map((r) => r.id);
+  if (!paths.length && byPath.length) lines.push(`more with --paths <files>: ${byPath.join(', ')}`);
   out(lines.length ? clip(lines, 12) : [`nothing fires for ${event}${paths.length ? ' on these paths' : ''}`]);
 }
