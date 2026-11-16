@@ -12,7 +12,7 @@
     .\move-app-homes.ps1 -Rollback  # undo every move recorded in the manifest
 #>
 [CmdletBinding()]
-param([switch]$Apply, [switch]$Rollback, [string]$Root)
+param([switch]$Apply, [switch]$Rollback, [string]$Root, [string[]]$Only)
 $ErrorActionPreference = 'Stop'
 
 $cfgFile = Join-Path $env:USERPROFILE '.narvai\config.json'
@@ -35,12 +35,23 @@ $Plan = [ordered]@{
   "$env:LOCALAPPDATA\hermes"       = "$AppsRoot\hermes"
   "$U\orca\workspaces"             = (Join-Path $Root 'Worktrees\orca-legacy')
 }
-$Blockers = 'claude', 'codex', 'ChatGPT', 'Hermes', 'orca', 'Orca', 'Antigravity', 'agy', 'iii', 'Code'
-if ($Apply -or $Rollback) { agentmemory stop 2>&1 | Out-Null; Start-Sleep -Seconds 2 }
+# Which running apps hold each folder; -Only moves a subset while unrelated apps stay open.
+$Holders = @{
+  claude = 'claude', 'Code'; codex = 'codex', 'ChatGPT', 'Orca'; agents = 'codex', 'ChatGPT', 'Orca'; gemini = 'Antigravity', 'agy'
+  agentmemory = 'iii'; 'orca-home' = 'Orca', 'orca'; 'orca-appdata' = 'Orca', 'orca'; 'orca-legacy' = 'Orca', 'orca'
+  hermes = 'Hermes'; pi = 'pi'; narvai = @()
+}
+$Only = @($Only | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
+if ($Only) { foreach ($k in @($Plan.Keys)) { if ($Only -notcontains (Split-Path $Plan[$k] -Leaf)) { $Plan.Remove($k) } } }
+$Blockers = @($Plan.Values | ForEach-Object { $Holders[(Split-Path $_ -Leaf)] }) | Sort-Object -Unique
+if (($Apply -or $Rollback) -and $Blockers -contains 'iii') { agentmemory stop 2>&1 | Out-Null; Start-Sleep -Seconds 2 }
 
 function Busy {
   $p = Get-Process -ErrorAction SilentlyContinue | Where-Object { $Blockers -contains $_.ProcessName }
-  $p | Group-Object ProcessName | ForEach-Object { "$($_.Name) x$($_.Count)" }
+  if ($Plan.Values -contains "$AppsRoot\hermes") {
+    $p = @($p) + @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$env:LOCALAPPDATA\hermes\*" })
+  }
+  $p | Where-Object { $_ } | Group-Object ProcessName | ForEach-Object { "$($_.Name) x$($_.Count)" }
 }
 
 if ($Rollback) {
