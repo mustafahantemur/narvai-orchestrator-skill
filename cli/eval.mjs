@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { cfg, HARNESS, home } from './ortak.mjs';
+import { isAbsolute, join, relative, resolve } from 'node:path';
+import { cfg, git, HARNESS, home } from './ortak.mjs';
 
 // Evals run on the user's Claude subscription login only, never on an API key or a cloud provider account.
 const KEY_VARS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY'];
+const WRITERS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
+const CONTEXT = /narvai(.mjs"?|.cmd)?s+context/;
 
 function keyRisk(repos) {
   const found = KEY_VARS.filter((v) => process.env[v]).map((v) => `env ${v}`);
@@ -14,109 +16,163 @@ function keyRisk(repos) {
   return found;
 }
 
-function runClaude(prompt, cwd, sc) {
-  const line = `claude -p --output-format stream-json --verbose --no-session-persistence --permission-mode ${sc.permissionMode} --max-budget-usd ${Number(sc.maxBudgetUsd)}`;
+const linkedWorktree = (cwd) => {
+  const own = git(['rev-parse', '--path-format=absolute', '--git-dir'], cwd);
+  return Boolean(own) && own !== git(['rev-parse', '--path-format=absolute', '--git-common-dir'], cwd);
+};
+const reset = (cwd) => { git(['reset', '--hard', '-q'], cwd); git(['clean', '-fdq'], cwd); };
+
+// A skill counts as loaded when the Skill tool names it or its SKILL.md is read.
+export const skillOf = (path) => /[\\/]([^\\/]+)[\\/]SKILL\.md$/i.exec(path ?? '')?.[1];
+
+export function digest(events) {
+  const run = { skills: [], tools: [], commands: [], writes: [], reads: [], denied: [], steps: [], hookContext: false, allText: '', text: '', cost: null, ms: null, turns: null, model: null, usage: null, error: null };
+  const calls = new Map();
+  for (const ev of events) {
+    if (ev.type === 'system' && ev.subtype === 'init') { run.model = ev.model; run.apiKeySource = ev.apiKeySource ?? null; }
+    if (ev.type === 'system' && ev.subtype === 'hook_response' && JSON.stringify(ev).includes('narvai context:')) run.hookContext = true;
+    if (ev.type === 'assistant') for (const c of ev.message?.content ?? []) {
+      if (c.type === 'text') run.allText += c.text + '\n';
+      if (c.type !== 'tool_use') continue;
+      const input = c.input ?? {};
+      const path = input.file_path ?? input.notebook_path ?? '';
+      const arg = input.command ?? input.skill ?? path ?? '';
+      calls.set(c.id, { name: c.name, arg });
+      run.tools.push(c.name);
+      run.steps.push(`${c.name} ${String(arg || JSON.stringify(input)).replace(/\s+/g, ' ').slice(0, 220)}`);
+      if (WRITERS.includes(c.name)) run.writes.push(path);
+      if (c.name === 'Skill' && input.skill) run.skills.push(input.skill.split(':').at(-1));
+      if (c.name === 'Read') run.reads.push(path);
+      if (c.name === 'Read' && skillOf(path)) run.skills.push(skillOf(path));
+      if (input.command) run.commands.push({ id: c.id, text: input.command });
+    }
+    if (ev.type === 'user') for (const c of Array.isArray(ev.message?.content) ? ev.message.content : []) {
+      if (c.type !== 'tool_result' || !c.is_error) continue;
+      const text = typeof c.content === 'string' ? c.content : JSON.stringify(c.content ?? '');
+      if (/hook/i.test(text)) run.denied.push({ id: c.tool_use_id, call: calls.get(c.tool_use_id), text: text.slice(0, 200) });
+    }
+    if (ev.type === 'result') {
+      run.text = ev.result ?? ''; run.cost = ev.total_cost_usd ?? null; run.ms = ev.duration_ms ?? null; run.turns = ev.num_turns ?? null;
+      const u = ev.usage ?? {};
+      run.usage = { input: u.input_tokens ?? 0, cacheWrite: u.cache_creation_input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, output: u.output_tokens ?? 0 };
+      if (ev.is_error) run.error = ev.subtype;
+    }
+  }
+  run.skills = [...new Set(run.skills)];
+  return run;
+}
+
+function runClaude(sc, cwd, transcript) {
+  const line = ['claude -p --output-format stream-json --verbose --no-session-persistence', `--permission-mode ${sc.permissionMode}`, `--max-budget-usd ${Number(sc.maxBudgetUsd)}`, sc.model ? `--model ${sc.model}` : ''].join(' ');
   const env = { ...process.env };
   for (const v of KEY_VARS) delete env[v];
   return new Promise((done) => {
     const child = spawn(line, { cwd, shell: true, env });
-    const run = { skills: [], tools: [], commands: [], writes: [], allText: '', text: '', cost: null, ms: null, turns: null, model: null, error: null };
-    let buf = '';
-    const timer = setTimeout(() => { run.error = 'timeout'; child.kill(); }, sc.timeoutSec * 1000);
+    const events = [];
+    let buf = '', stderr = '', error = null;
+    const timer = setTimeout(() => { error = 'timeout'; child.kill(); }, sc.timeoutSec * 1000);
     child.stdout.on('data', (d) => {
       buf += d;
       let i;
       while ((i = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, i); buf = buf.slice(i + 1);
-        let ev; try { ev = JSON.parse(line); } catch { continue; }
-        if (ev.type === 'system' && ev.subtype === 'init') {
-          run.model = ev.model;
-          run.apiKeySource = ev.apiKeySource ?? null;
-          if (run.apiKeySource && run.apiKeySource !== 'none') { run.error = `api key in use (${run.apiKeySource}), aborted`; child.kill(); }
-        }
-        if (ev.type === 'assistant') for (const c of ev.message?.content ?? []) {
-          if (c.type === 'text') run.allText += c.text + '\n';
-          if (c.type !== 'tool_use') continue;
-          run.tools.push(c.name);
-          if (['Edit', 'Write', 'NotebookEdit'].includes(c.name)) run.writes.push(c.input?.file_path ?? c.input?.notebook_path ?? '');
-          if (c.name === 'Skill') run.skills.push(c.input?.skill);
-          if (c.input?.command) run.commands.push(c.input.command);
-        }
-        if (ev.type === 'result') {
-          run.text = ev.result ?? ''; run.cost = ev.total_cost_usd ?? null; run.ms = ev.duration_ms ?? null; run.turns = ev.num_turns ?? null;
-          if (ev.is_error) run.error = ev.subtype;
-        }
+        let ev; try { ev = JSON.parse(buf.slice(0, i)); } catch { ev = null; }
+        buf = buf.slice(i + 1);
+        if (!ev) continue;
+        events.push(ev);
+        if (ev.type === 'system' && ev.subtype === 'init' && ev.apiKeySource && ev.apiKeySource !== 'none') { error = `api key in use (${ev.apiKeySource}), aborted`; child.kill(); }
       }
     });
-    let stderr = '';
     child.stderr.on('data', (d) => { stderr += d; });
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (run.cost === null && !run.error) run.error = `no result (exit ${code}): ${stderr.trim().split('\n').slice(-3).join(' | ').slice(0, 300)}`;
+      writeFileSync(transcript, events.map((e) => JSON.stringify(e)).join('\n'));
+      const run = digest(events);
+      run.error = error ?? run.error ?? (run.cost === null ? `no result (exit ${code}): ${stderr.trim().split('\n').slice(-3).join(' | ').slice(0, 300)}` : null);
       done(run);
     });
-    child.stdin.end(prompt);
+    child.stdin.end(sc.prompt);
   });
 }
 
-function judge(sc, run) {
+export function judge(sc, run, cwd) {
   const checks = [];
-  const add = (name, ok, detail = '') => checks.push({ name, ok, detail });
+  const add = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail });
   const rx = (p) => new RegExp(p, 'i');
+  const cmds = run.commands.map((c) => c.text);
+  const blocked = new Set(run.denied.map((d) => d.id));
+  const fullContext = cmds.some((c) => CONTEXT.test(c) && !/--hook/.test(c)) || run.reads.some((p) => /project-rules.md$|profiles[\/][^\/]+[\/]rules.md$/.test(p));
+  add('repo context present', run.hookContext || fullContext);
+  if (sc.fullContext) add('full rules read before the change', fullContext);
   for (const s of sc.skillsAll ?? []) add(`skill ${s}`, run.skills.includes(s));
-  if (sc.skillsAny?.length) add(`any skill of ${sc.skillsAny.join('|')}`, sc.skillsAny.some((s) => run.skills.includes(s)));
-  const planDir = join(home(), '.claude', 'plans').toLowerCase();
-  const repoWrites = run.writes.filter((p) => !resolve(p).toLowerCase().startsWith(planDir));
-  for (const t of sc.toolsNone ?? []) {
-    if (['Edit', 'Write', 'NotebookEdit'].includes(t)) continue;
-    add(`no ${t}`, !run.tools.includes(t));
+  if (sc.skillsAny?.length) add(`any skill of ${sc.skillsAny.join('|')}`, sc.skillsAny.some((s) => run.skills.includes(s)), `loaded: ${run.skills.join(', ') || 'none'}`);
+  for (const p of sc.commandsAll ?? []) add(`command /${p}/`, cmds.some((c) => rx(p).test(c)));
+  if (sc.commandsAny?.length) add(`any command of ${sc.commandsAny.length}`, sc.commandsAny.some((p) => cmds.some((c) => rx(p).test(c))));
+  if (sc.toolsAny?.length) add(`any tool of ${sc.toolsAny.join('|')}`, sc.toolsAny.some((t) => run.tools.some((x) => rx(t).test(x))));
+  for (const t of sc.toolsNone ?? []) add(`no ${t}`, !run.tools.includes(t));
+  const inRepo = run.writes.filter((p) => { const r = relative(cwd, resolve(cwd, p)); return r && !r.startsWith('..') && !isAbsolute(r); });
+  if (sc.writesNone) add('no write inside the repo', !inRepo.length, inRepo.join(', '));
+  // A command the hook refused did not run; the attempt is reported, the check passes.
+  for (const b of sc.bashNone ?? []) { const hit = run.commands.find((c) => rx(b).test(c.text) && !blocked.has(c.id)); add(`no command /${b}/`, !hit, hit?.text.slice(0, 120) ?? ''); }
+  for (const f of sc.filesAll ?? []) {
+    const p = join(cwd, f.path);
+    const text = existsSync(p) ? readFileSync(p, 'utf8') : '';
+    if (f.contains) add(`${f.path} contains "${f.contains}"`, text.includes(f.contains));
+    if (f.notContains) add(`${f.path} does not contain "${f.notContains}"`, !text.includes(f.notContains));
   }
-  if ((sc.toolsNone ?? []).some((t) => ['Edit', 'Write', 'NotebookEdit'].includes(t))) add('no write outside the plan file', !repoWrites.length, repoWrites.join(', '));
-  for (const b of sc.bashNone ?? []) { const hit = run.commands.find((c) => rx(b).test(c)); add(`no command /${b}/`, !hit, hit ?? ''); }
-  const seen = `${run.allText ?? ''}\n${run.text}`;
+  const seen = `${run.allText}\n${run.text}`;
   for (const p of sc.textAll ?? []) add(`text /${p}/`, rx(p).test(seen));
   if (sc.textAny?.length) add(`text any of ${sc.textAny.length}`, sc.textAny.some((p) => rx(p).test(seen)));
-  const unnamed = [...new Set(run.skills)].filter((s) => s && !(run.allText + run.text).toLowerCase().includes(s.split(':').at(-1).toLowerCase()));
-  add('names the skills it used', unnamed.length === 0, unnamed.join(', '));
+  const unnamed = run.skills.filter((s) => !seen.toLowerCase().includes(s.toLowerCase()));
+  add('names the skills it loaded', unnamed.length === 0, unnamed.join(', '));
   if (run.error) add('run finished', false, run.error);
   return checks;
+}
+
+async function lane(list, cwd, dir) {
+  const results = [];
+  for (const s of list) {
+    if (results.some((r) => r.error?.startsWith('api key'))) break;
+    reset(cwd);
+    for (const e of s.setup ?? []) {
+      const p = join(cwd, e.file);
+      const before = readFileSync(p, 'utf8');
+      if (!before.includes(e.find)) throw new Error(`${s.id}: setup text not found in ${e.file}`);
+      writeFileSync(p, before.replace(e.find, e.replace));
+    }
+    const run = await runClaude(s, cwd, join(dir, `${s.id}.jsonl`));
+    const checks = judge(s, run, cwd);
+    const pass = checks.every((c) => c.ok);
+    const diff = git(['status', '--short'], cwd);
+    results.push({ id: s.id, repo: s.repo, why: s.why, prompt: s.prompt, pass, checks, changed: diff ? diff.split('\n') : [], ...run, commands: run.commands.map((c) => c.text) });
+    console.log(`${pass ? 'PASS' : 'FAIL'}  ${s.id}  $${run.cost?.toFixed(2) ?? '?'}  ${Math.round((run.ms ?? 0) / 1000)}s  ${run.turns ?? '?'} turns  skills: ${run.skills.join(', ') || '-'}${run.denied.length ? `  hook refused ${run.denied.length}` : ''}`);
+    for (const c of checks.filter((c) => !c.ok)) console.log(`     ✗ ${c.name}${c.detail ? ` (${c.detail})` : ''}`);
+  }
+  reset(cwd);
+  return results;
 }
 
 export default async function run(args) {
   const conf = cfg();
   const spec = JSON.parse(readFileSync(join(HARNESS, 'evals', 'scenarios.json'), 'utf8'));
-  const only = args.find((a) => a.startsWith('--only='))?.split('=')[1]?.split(',');
-  const dry = args.includes('--dry-run');
-  const list = spec.scenarios.filter((s) => !only || only.includes(s.id)).map((s) => ({ ...spec.defaults, ...s }));
+  const opt = (k) => args.find((a) => a.startsWith(`--${k}=`))?.split('=')[1];
+  const only = opt('only')?.split(',');
+  const list = spec.scenarios.filter((s) => !only || only.includes(s.id)).map((s) => ({ ...spec.defaults, ...s, ...(opt('model') ? { model: opt('model') } : {}) }));
   const repos = conf.evalRepos ?? {};
-  const cap = list.reduce((n, s) => n + s.maxBudgetUsd, 0);
-  console.log(`${list.length} scenario(s), spend cap $${cap.toFixed(2)} (--max-budget-usd per run)`);
-  if (dry) { for (const s of list) console.log(`  ${s.id}  [${s.repo} → ${repos[s.repo] ?? 'MISSING evalRepos'}]  "${s.prompt}"`); return; }
+  console.log(`${list.length} scenario(s), spend cap $${list.reduce((n, s) => n + s.maxBudgetUsd, 0).toFixed(2)} (--max-budget-usd per run)`);
+  if (args.includes('--dry-run')) { for (const s of list) console.log(`  ${s.id}  [${s.repo} → ${repos[s.repo] ?? 'MISSING evalRepos'}]  "${s.prompt}"`); return; }
+  const used = [...new Set(list.map((s) => s.repo))];
+  for (const r of used) {
+    if (!repos[r] || !existsSync(repos[r])) throw new Error(`evalRepos.${r} is not set in ~/.narvai/config.json`);
+    if (!linkedWorktree(repos[r])) throw new Error(`evalRepos.${r} must be a linked git worktree (git worktree add --detach <dir>): scenarios edit files and the runner resets the tree between them`);
+  }
   const risk = keyRisk(Object.values(repos));
   if (risk.length) { console.error(`refusing to run: an API key or provider account could be used (${risk.join(', ')}). Evals run on the subscription login only.`); process.exit(1); }
-  const results = [];
-  for (const s of list) {
-    if (results.some((r) => r.error?.startsWith('api key'))) { console.log(`STOP: an API key was in use; remaining scenarios not run`); break; }
-    const cwd = repos[s.repo];
-    if (!cwd || !existsSync(cwd)) { console.log(`SKIP ${s.id}: evalRepos.${s.repo} not set`); continue; }
-    process.stdout.write(`… ${s.id} `);
-    const run = await runClaude(s.prompt, cwd, s);
-    if (run.error?.startsWith('no result')) {
-      results.push({ id: s.id, pass: false, checks: [], ...run });
-      console.log(`ERROR  ${run.error}`);
-      continue;
-    }
-    const checks = judge(s, run);
-    const pass = checks.every((c) => c.ok);
-    results.push({ id: s.id, pass, checks, ...run });
-    console.log(`${pass ? 'PASS' : 'FAIL'}  $${run.cost?.toFixed(3) ?? '?'}  ${Math.round((run.ms ?? 0) / 1000)}s  skills: ${run.skills.join(', ') || '-'}`);
-    for (const c of checks.filter((c) => !c.ok)) console.log(`     ✗ ${c.name}${c.detail ? ` (${c.detail})` : ''}`);
-  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const dir = join(conf.storeRoot ?? join(home(), '.narvai'), 'dev-harness', 'evals', stamp);
+  mkdirSync(dir, { recursive: true });
+  const results = (await Promise.all(used.map((r) => lane(list.filter((s) => s.repo === r), repos[r], dir)))).flat();
   const total = results.reduce((n, r) => n + (r.cost ?? 0), 0);
-  console.log(`\n${results.filter((r) => r.pass).length}/${results.length} pass, cost $${total.toFixed(3)}`);
-  const outDir = join(conf.storeRoot ?? join(home(), '.narvai'), 'dev-harness', 'evals');
-  mkdirSync(outDir, { recursive: true });
-  const out = join(outDir, `${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-  writeFileSync(out, JSON.stringify({ at: new Date().toISOString(), total_cost_usd: total, results }, null, 2));
-  console.log(`results: ${out}`);
+  console.log(`\n${results.filter((r) => r.pass).length}/${results.length} pass, cost $${total.toFixed(2)}`);
+  writeFileSync(join(dir, 'results.json'), JSON.stringify({ at: new Date().toISOString(), total_cost_usd: total, results }, null, 2));
+  console.log(`results and transcripts: ${dir}`);
 }
