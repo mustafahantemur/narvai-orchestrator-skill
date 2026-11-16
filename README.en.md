@@ -91,8 +91,8 @@ do by hand. Running it again is safe, and it backs up every file it changes unde
 - In Codex it turns on the `CLAUDE.md` fallback for project instructions and turns off the import sync that copies
   Claude content.
 - When Orca is closed it replaces Hermes' `--yolo` argument with `--checkpoints`, sets the worktree folder to
-  `<root>\Worktrees` and, when the config has `orcaDefaultAgent` (`claude`, `codex`, `hermes`), makes that the default
-  agent.
+  `<root>\Worktrees` and makes Claude Code the default agent (`orcaDefaultAgent` in the config: `claude`, `codex` or
+  `hermes`).
 
 ### By hand
 

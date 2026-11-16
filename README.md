@@ -88,7 +88,7 @@ node narvai.mjs setup [--root D:\AI] [--claude-subscription] [--dry-run]
   model yapar.
 - Codex'te proje talimatı için `CLAUDE.md` fallback'ini açar, Claude içeriğini kopyalayan import sync'ini kapatır.
 - Orca kapalıysa Hermes argümanını `--yolo` yerine `--checkpoints` yapar, worktree klasörünü `<kök>\Worktrees` olarak
-  ayarlar ve config'de `orcaDefaultAgent` varsa (`claude`, `codex`, `hermes`) varsayılan agent'ı o yapar.
+  ayarlar ve varsayılan agent'ı Claude Code yapar (config'de `orcaDefaultAgent`: `claude`, `codex` ya da `hermes`).
 
 ### Elle yapılacaklar
 
