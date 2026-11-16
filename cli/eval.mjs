@@ -129,6 +129,7 @@ export function judge(sc, run, cwd, tree) {
   const seen = `${run.allText}\n${run.text}`;
   for (const p of sc.textAll ?? []) add(`text /${p}/`, rx(p).test(seen));
   if (sc.textAny?.length) add(`text any of ${sc.textAny.length}`, sc.textAny.some((p) => rx(p).test(seen)));
+  if (sc.turnsMax) add(`at most ${sc.turnsMax} turns`, (run.turns ?? Infinity) <= sc.turnsMax, `${run.turns} turns`);
   const unnamed = run.skills.filter((s) => !seen.toLowerCase().includes(s.toLowerCase()));
   add('names the skills it loaded', unnamed.length === 0, unnamed.join(', '));
   if (run.error) add('run finished', false, run.error);
