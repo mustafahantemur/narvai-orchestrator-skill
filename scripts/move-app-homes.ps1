@@ -37,14 +37,15 @@ $Plan = [ordered]@{
 }
 # Which running apps hold each folder; -Only moves a subset while unrelated apps stay open.
 $Holders = @{
-  claude = 'claude', 'Code'; codex = 'codex', 'ChatGPT', 'Orca'; agents = 'codex', 'ChatGPT', 'Orca'; gemini = 'Antigravity', 'agy'
+  claude = 'claude', 'Code'; codex = 'codex', 'ChatGPT', 'Orca', 'Code'; agents = 'codex', 'ChatGPT', 'Orca', 'Code'; gemini = 'Antigravity', 'agy'
   agentmemory = 'iii'; 'orca-home' = 'Orca', 'orca'; 'orca-appdata' = 'Orca', 'orca'; 'orca-legacy' = 'Orca', 'orca'
   hermes = 'Hermes'; pi = 'pi'; narvai = @()
 }
 $Only = @($Only | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
 if ($Only) { foreach ($k in @($Plan.Keys)) { if ($Only -notcontains (Split-Path $Plan[$k] -Leaf)) { $Plan.Remove($k) } } }
 $Blockers = @($Plan.Values | ForEach-Object { $Holders[(Split-Path $_ -Leaf)] }) | Sort-Object -Unique
-if (($Apply -or $Rollback) -and $Blockers -contains 'iii') { agentmemory stop 2>&1 | Out-Null; Start-Sleep -Seconds 2 }
+$stoppedMemory = ($Apply -or $Rollback) -and $Blockers -contains 'iii'
+if ($stoppedMemory) { agentmemory stop 2>&1 | Out-Null; Start-Sleep -Seconds 2 }
 
 function Busy {
   $p = Get-Process -ErrorAction SilentlyContinue | Where-Object { $Blockers -contains $_.ProcessName }
@@ -105,5 +106,5 @@ d.settings.agentDefaultArgs={...d.settings.agentDefaultArgs,hermes:'--checkpoint
 fs.writeFileSync(p,JSON.stringify(d));console.log('orca: workspaceDir + hermes args set');
 "@ $orcaData
 }
-Start-ScheduledTask -TaskName 'AgentMemory (unified-harness)' -ErrorAction SilentlyContinue
+if ($stoppedMemory) { Start-ScheduledTask -TaskName 'AgentMemory (unified-harness)' -ErrorAction SilentlyContinue }
 Write-Host "done. Manifest: $Manifest"
