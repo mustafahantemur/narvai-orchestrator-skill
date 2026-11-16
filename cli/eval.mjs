@@ -101,7 +101,8 @@ function runClaude(sc, cwd, transcript) {
   });
 }
 
-export function judge(sc, run, cwd) {
+// `tree` is what the scenario left behind: the changed paths and a way to ask whether a file holds a text.
+export function judge(sc, run, cwd, tree) {
   const checks = [];
   const add = (name, ok, detail = '') => checks.push({ name, ok: Boolean(ok), detail });
   const rx = (p) => new RegExp(p, 'i');
@@ -121,11 +122,10 @@ export function judge(sc, run, cwd) {
   // A command the hook refused did not run; the attempt is reported, the check passes.
   for (const b of sc.bashNone ?? []) { const hit = run.commands.find((c) => rx(b).test(c.text) && !blocked.has(c.id)); add(`no command /${b}/`, !hit, hit?.text.slice(0, 120) ?? ''); }
   for (const f of sc.filesAll ?? []) {
-    const p = join(cwd, f.path);
-    const text = existsSync(p) ? readFileSync(p, 'utf8') : '';
-    if (f.contains) add(`${f.path} contains "${f.contains}"`, text.includes(f.contains));
-    if (f.notContains) add(`${f.path} does not contain "${f.notContains}"`, !text.includes(f.notContains));
+    if (f.contains) add(`${f.path} contains "${f.contains}"`, tree.contains(f.path, f.contains));
+    if (f.notContains) add(`${f.path} does not contain "${f.notContains}"`, !tree.contains(f.path, f.notContains));
   }
+  for (const p of sc.changedAll ?? []) add(`${p} was changed`, tree.changed.some((l) => l.trim().replace(/^\S+\s+/, '').replaceAll('"', '') === p));
   const seen = `${run.allText}\n${run.text}`;
   for (const p of sc.textAll ?? []) add(`text /${p}/`, rx(p).test(seen));
   if (sc.textAny?.length) add(`text any of ${sc.textAny.length}`, sc.textAny.some((p) => rx(p).test(seen)));
@@ -135,7 +135,7 @@ export function judge(sc, run, cwd) {
   return checks;
 }
 
-async function lane(list, cwd, dir) {
+async function lane(list, cwd, dir, save) {
   const results = [];
   for (const s of list) {
     if (results.some((r) => r.error?.startsWith('api key'))) break;
@@ -147,10 +147,13 @@ async function lane(list, cwd, dir) {
       writeFileSync(p, before.replace(e.find, e.replace));
     }
     const run = await runClaude(s, cwd, join(dir, `${s.id}.jsonl`));
-    const checks = judge(s, run, cwd);
+    const changed = git(['status', '--short'], cwd).split('\n').filter(Boolean);
+    const contains = (p, text) => existsSync(join(cwd, p)) && readFileSync(join(cwd, p), 'utf8').includes(text);
+    const facts = (s.filesAll ?? []).flatMap((x) => [x.contains, x.notContains].filter(Boolean).map((text) => ({ path: x.path, text, found: contains(x.path, text) })));
+    const checks = judge(s, run, cwd, { changed, contains });
     const pass = checks.every((c) => c.ok);
-    const diff = git(['status', '--short'], cwd);
-    results.push({ id: s.id, repo: s.repo, why: s.why, prompt: s.prompt, pass, checks, changed: diff ? diff.split('\n') : [], ...run, commands: run.commands.map((c) => c.text) });
+    results.push({ id: s.id, repo: s.repo, why: s.why, prompt: s.prompt, pass, checks, changed, facts, ...run, commands: run.commands.map((c) => c.text) });
+    save(results);
     console.log(`${pass ? 'PASS' : 'FAIL'}  ${s.id}  $${run.cost?.toFixed(2) ?? '?'}  ${Math.round((run.ms ?? 0) / 1000)}s  ${run.turns ?? '?'} turns  skills: ${run.skills.join(', ') || '-'}${run.denied.length ? `  hook refused ${run.denied.length}` : ''}`);
     for (const c of checks.filter((c) => !c.ok)) console.log(`     ✗ ${c.name}${c.detail ? ` (${c.detail})` : ''}`);
   }
@@ -158,10 +161,37 @@ async function lane(list, cwd, dir) {
   return results;
 }
 
+// Scores saved transcripts again with the current scenarios and checks; what the files held is taken from the saved run.
+export function rejudge(dir, spec, repos) {
+  const saved = JSON.parse(readFileSync(join(dir, 'results.json'), 'utf8')).results;
+  return saved.filter((old) => existsSync(join(dir, `${old.id}.jsonl`)) && spec.scenarios.some((s) => s.id === old.id)).map((old) => {
+    const sc = { ...spec.defaults, ...spec.scenarios.find((s) => s.id === old.id) };
+    const events = readFileSync(join(dir, `${old.id}.jsonl`), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    const run = { ...digest(events), error: old.error };
+    const known = (p, text) => old.facts?.find((x) => x.path === p && x.text === text)?.found ?? old.checks.find((c) => c.name === `${p} contains "${text}"`)?.ok ?? false;
+    const checks = judge(sc, run, repos[sc.repo], { changed: old.changed ?? [], contains: known });
+    return { id: old.id, repo: old.repo, pass: checks.every((c) => c.ok), checks, skills: run.skills, turns: run.turns, ms: run.ms, cost: run.cost, usage: run.usage, denied: run.denied.length, commands: run.commands.map((c) => c.text), text: run.text };
+  });
+}
+
+function report(rows) {
+  for (const r of rows) {
+    console.log(`${r.pass ? 'PASS' : 'FAIL'}  ${r.id}  $${r.cost?.toFixed(2) ?? '?'}  ${Math.round((r.ms ?? 0) / 1000)}s  ${r.turns ?? '?'} turns  skills: ${r.skills.join(', ') || '-'}${r.denied ? `  hook refused ${r.denied}` : ''}`);
+    for (const c of r.checks.filter((c) => !c.ok)) console.log(`     ✗ ${c.name}${c.detail ? ` (${c.detail})` : ''}`);
+  }
+  console.log(`\n${rows.filter((r) => r.pass).length}/${rows.length} pass`);
+}
+
 export default async function run(args) {
   const conf = cfg();
   const spec = JSON.parse(readFileSync(join(HARNESS, 'evals', 'scenarios.json'), 'utf8'));
   const opt = (k) => args.find((a) => a.startsWith(`--${k}=`))?.split('=')[1];
+  if (opt('rejudge')) {
+    const rows = rejudge(opt('rejudge'), spec, conf.evalRepos ?? {});
+    report(rows);
+    writeFileSync(join(opt('rejudge'), 'rejudged.json'), JSON.stringify({ at: new Date().toISOString(), results: rows }, null, 2));
+    return;
+  }
   const only = opt('only')?.split(',');
   const list = spec.scenarios.filter((s) => !only || only.includes(s.id)).map((s) => ({ ...spec.defaults, ...s, ...(opt('model') ? { model: opt('model') } : {}) }));
   const repos = conf.evalRepos ?? {};
@@ -177,7 +207,10 @@ export default async function run(args) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const dir = join(conf.storeRoot ?? join(home(), '.narvai'), 'dev-harness', 'evals', stamp);
   mkdirSync(dir, { recursive: true });
-  const results = (await Promise.all(used.map((r) => lane(list.filter((s) => s.repo === r), repos[r], dir)))).flat();
+  // Each lane rewrites the results file after every scenario, so an interrupted run keeps what it finished.
+  const done = {};
+  const save = (r) => (rows) => { done[r] = rows; writeFileSync(join(dir, 'results.json'), JSON.stringify({ at: new Date().toISOString(), results: Object.values(done).flat() }, null, 2)); };
+  const results = (await Promise.all(used.map((r) => lane(list.filter((s) => s.repo === r), repos[r], dir, save(r))))).flat();
   const total = results.reduce((n, r) => n + (r.cost ?? 0), 0);
   console.log(`\n${results.filter((r) => r.pass).length}/${results.length} pass, cost $${total.toFixed(2)}`);
   writeFileSync(join(dir, 'results.json'), JSON.stringify({ at: new Date().toISOString(), total_cost_usd: total, results }, null, 2));

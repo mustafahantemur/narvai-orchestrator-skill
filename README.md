@@ -35,7 +35,7 @@ Per repository: add its path and a store folder to `<storeRoot>/map.json`, then 
 | File | Purpose |
 |---|---|
 | `~/.narvai/rules.md` | Your own rules, appended to the core rules. |
-| `~/.narvai/guard.json` | Your deny rules, same shape as `hooks/deny.json`. |
+| `~/.narvai/guard.json` | Your deny rules, same shape as `hooks/deny.json`. Only you edit it: the guard refuses an agent that touches it. |
 | `<store>/<project>/project-rules.md` | Project rules. A first line `include: <path>` pulls in a shared file. |
 | `<store>/<project>/verify.json` | Replaces the profile's checks for that repository. |
 
@@ -49,16 +49,21 @@ narvai tests [--failed <file>]      changed sources whose tests were not touched
 narvai contract                     the steps when an endpoint, DTO or enum changed
 narvai skill <name> | --list        where a skill is and what it is for
 narvai graph <build|status>         optional code graphs, built without a model
-narvai allow <rule-id>              a timed exception to a deny rule, when the user agrees
+narvai allow <rule-id>              a timed exception to a deny rule; you run it in your own terminal, an agent cannot
+narvai eval [--only=a,b] [--rejudge=<dir>]   behaviour scenarios through headless Claude Code; re-score a saved run
 narvai doctor [--fix]               installation and content checks
 narvai sync                         regenerate rule files, links, agents and hooks
 ```
 
 `node narvai.mjs` without a command lists all of them.
 
+## The guard
+
+`hooks/guard.mjs` refuses the commands the deny rules describe and tells the agent what to do instead. It is a net for honest mistakes, not a sandbox: a command built to get past a pattern will. A rule without `tool` applies to shell commands; with `tool` it applies to every tool whose name matches; `path` matches an edited file. A rule marked `fixed` cannot be lifted. The others are lifted for a limited time by `narvai allow <rule-id>`, which needs a terminal, so only a person can run it. A rule file that does not parse counts as empty and a rule whose expression does not compile is skipped alone; `narvai doctor` reports both.
+
 ## How a skill gets used
 
-Nothing is loaded up front. The agent runs `narvai next --event <moment>` and reads only the files it prints. A route in `registry/routes.json` names an event, optional path globs and at most three skills. `registry/skills.json` records every skill on disk with a reviewed fit (`core`, `stack`, `on-demand`, `out`). To add or change a route, edit `routes.json` and run `narvai sync`; `narvai doctor` fails on a route that names a skill that does not exist.
+Nothing is loaded up front. The agent runs `narvai next --event <moment>` and reads only the files it prints. A route in `registry/routes.json` names an event, optional path globs (`paths`, and `except` to take test, story or generated files out again) and at most three skills. A route with no skills is a one-line note, such as "generated file: regenerate it". For `edit` routes a hook names the same skills at the first edit of a matching file, including the project's own design skill when the store names one. `registry/skills.json` records every skill on disk with a reviewed fit (`core`, `stack`, `on-demand`, `out`). To add or change a route, edit `routes.json` and run `narvai sync`; `narvai doctor` fails on a route that names a skill that does not exist.
 
 ## Adding a stack
 

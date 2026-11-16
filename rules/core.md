@@ -16,6 +16,7 @@ These rules apply to every task. When two instructions disagree, the order is: t
   - `tests --paths <file>`: before writing or changing tests. `refactor --paths <file>`: before restructuring without changing behaviour.
   - `done`: before you say a change is finished.
   - `review --paths <files>`: the user asked for a review. `prose`: before writing text a person will read. `ship`: the user asked for a commit, a push or a PR.
+- When an endpoint, DTO, enum or error code changes, `narvai contract` prints the steps across the backend and its clients.
 - Never guess a skill name. `narvai skill --list` shows what exists; `narvai skill <name>` gives the file.
 - `narvai` is a command on PATH. If a shell does not find it, use `{{NARVAI}}`.
 - Say in one line which skills you loaded for the task, or that you loaded none.

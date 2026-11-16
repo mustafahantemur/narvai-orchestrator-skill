@@ -169,7 +169,8 @@
         "modern-web-guidance"
       ],
       "localChanges": [
-        "skills/modern-web-guidance only (SKILL.md, guides/, LICENSE); the skill itself calls `npx modern-web-guidance@latest` for search/retrieve"
+        "skills/modern-web-guidance only (SKILL.md, guides/, LICENSE); the skill itself calls `npx modern-web-guidance@latest` for search/retrieve",
+        "the npx calls are pinned to modern-web-guidance@1.0.1 instead of @latest"
       ]
     },
     {
@@ -328,7 +329,8 @@
         "the five reviewers are ECC agents (agents/*.md) wrapped as skills: the agent frontmatter (model, tools) and the \"Prompt Defense Baseline\" block are removed",
         "csharp-reviewer and react-reviewer: \"Diagnostic Commands\" removed (the checks are narvai verify's job); react-reviewer: \"Scope vs typescript-reviewer\" and \"Related\" removed",
         "i18n-sync: \"Optional Locakit Reports\", \"Hook Integration\" and \"Related\" removed",
-        "database-migrations: the Prisma, Drizzle, Kysely, Django and golang-migrate sections removed"
+        "database-migrations: the Prisma, Drizzle, Kysely, Django and golang-migrate sections removed",
+        "react-reviewer: \"When invoked\" removed (it drives GitHub’s gh CLI and reruns lint and typecheck, which narvai verify owns)"
       ]
     }
   ],
