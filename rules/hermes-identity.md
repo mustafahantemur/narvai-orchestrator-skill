@@ -6,6 +6,3 @@ The shared skills and rules below name Claude Code tools. Use the Hermes equival
 Agent/Task tool or `subagent_type` → `delegate_task`; AskUserQuestion → `clarify`; TodoWrite/TaskCreate → `todo_list`;
 Bash/PowerShell → `terminal`; Read/Write/Edit → `read_file`/`write_file`/`patch`; Grep/Glob → `search_files`;
 WebFetch/WebSearch → `web_extract`/`web_search`; EnterPlanMode/ExitPlanMode → state the plan in chat and wait for approval.
-A skill that cites `references/...` relative to its plugin (agent-skills) finds it in the plugin root, the parent of the
-plugin's `skills` folder (resolve the `plugin-skills/<plugin>` link in the Hermes home). Two skills share the names `tdd`
-and `teach`: load them as `pstack/tdd` or `mattpocock-skills/tdd`.

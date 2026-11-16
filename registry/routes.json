@@ -1,0 +1,361 @@
+{
+  "about": "Which skill at which moment. Curated by hand. The backbone is the software lifecycle of addyosmani/agent-skills (define, plan, build, verify, review, ship): each phase has one agent-skills owner, and stack, UI, security and simplicity skills attach to a phase as specialists. The agent-skills router text is not loaded; this file is the router. Where an agent-skills skill disagrees with the user's rules (when tests are written, when to commit, how much ceremony a small task gets), the user's rules win. `listed` skills are visible to every agent; every other skill is reached through a route or `narvai skill <name>`. `@project-design` is the design skill named in the project profile. At most three skills per route.",
+  "phases": {
+    "define": "Small tasks skip it. Used when the request is unclear or the work is large.",
+    "plan": "Three or more files, or a contract change. Otherwise skip.",
+    "build": "Every code change. The owner is used for multi-file work; specialists attach by file type.",
+    "verify": "Every code change: `narvai verify`, `narvai tests`, and the owner on any failure.",
+    "review": "Only after the user says yes to a review, except the self-check at `done`.",
+    "ship": "Only when the user asks for a commit, push or pull request."
+  },
+  "listed": [
+    "narvai-orchestrator",
+    "unslop",
+    "caveman",
+    "interview-me",
+    "spec-driven-development",
+    "planning-and-task-breakdown",
+    "incremental-implementation",
+    "debugging-and-error-recovery"
+  ],
+  "routes": [
+    {
+      "id": "unclear",
+      "phase": "define",
+      "when": {
+        "event": "unclear"
+      },
+      "skills": [
+        "interview-me"
+      ],
+      "why": "the request does not say who, why, what done looks like or the binding constraint"
+    },
+    {
+      "id": "idea",
+      "phase": "define",
+      "when": {
+        "event": "idea"
+      },
+      "skills": [
+        "idea-refine"
+      ],
+      "why": "an idea to shape before it is a requirement"
+    },
+    {
+      "id": "plan",
+      "phase": "plan",
+      "when": {
+        "event": "plan"
+      },
+      "skills": [
+        "spec-driven-development",
+        "planning-and-task-breakdown"
+      ],
+      "why": "work that touches three or more files or changes a contract"
+    },
+    {
+      "id": "build",
+      "phase": "build",
+      "when": {
+        "event": "build"
+      },
+      "skills": [
+        "incremental-implementation"
+      ],
+      "why": "multi-file implementation in small verifiable slices"
+    },
+    {
+      "id": "library",
+      "phase": "build",
+      "when": {
+        "event": "library"
+      },
+      "skills": [
+        "source-driven-development"
+      ],
+      "why": "code against an external library or framework API: read its current documentation first (Context7)"
+    },
+    {
+      "id": "interface",
+      "phase": "build",
+      "when": {
+        "event": "edit",
+        "paths": [
+          "**/*Endpoints.cs",
+          "**/*Controller.cs",
+          "**/Contracts/**/*.cs"
+        ]
+      },
+      "skills": [
+        "api-and-interface-design",
+        "dotnet-webapi"
+      ],
+      "why": "a public endpoint or contract changes"
+    },
+    {
+      "id": "ui",
+      "phase": "build",
+      "when": {
+        "event": "edit",
+        "paths": [
+          "**/*.tsx",
+          "**/*.jsx",
+          "**/*.css",
+          "**/*.scss"
+        ]
+      },
+      "skills": [
+        "@project-design",
+        "impeccable",
+        "modern-web-guidance"
+      ],
+      "why": "UI work"
+    },
+    {
+      "id": "react",
+      "phase": "build",
+      "when": {
+        "event": "edit",
+        "paths": [
+          "**/*.tsx",
+          "**/*.jsx"
+        ]
+      },
+      "skills": [
+        "vercel-react-best-practices"
+      ],
+      "why": "React component or data fetching change"
+    },
+    {
+      "id": "ef",
+      "phase": "build",
+      "when": {
+        "event": "edit",
+        "paths": [
+          "**/*Repository*.cs",
+          "**/Persistence/**/*.cs",
+          "**/Queries/**/*.cs"
+        ]
+      },
+      "skills": [
+        "optimizing-ef-core-queries"
+      ],
+      "why": "EF Core data access"
+    },
+    {
+      "id": "schema",
+      "phase": "build",
+      "when": {
+        "event": "edit",
+        "paths": [
+          "**/Migrations/**",
+          "**/*Configuration.cs",
+          "**/*.sql"
+        ]
+      },
+      "skills": [
+        "supabase-postgres-best-practices"
+      ],
+      "why": "PostgreSQL schema, index or query"
+    },
+    {
+      "id": "refactor",
+      "phase": "build",
+      "when": {
+        "event": "refactor",
+        "paths": [
+          "**/*.cs"
+        ]
+      },
+      "skills": [
+        "csharp-refactoring"
+      ],
+      "why": "behaviour-preserving C# change"
+    },
+    {
+      "id": "refactor-react",
+      "phase": "build",
+      "when": {
+        "event": "refactor",
+        "paths": [
+          "**/*.tsx",
+          "**/*.jsx"
+        ]
+      },
+      "skills": [
+        "vercel-composition-patterns"
+      ],
+      "why": "React component refactor: composition over boolean props"
+    },
+    {
+      "id": "migrate",
+      "phase": "build",
+      "when": {
+        "event": "migrate"
+      },
+      "skills": [
+        "deprecation-and-migration"
+      ],
+      "why": "replacing or retiring an API, a module or a dependency"
+    },
+    {
+      "id": "failure",
+      "phase": "verify",
+      "when": {
+        "event": "failure"
+      },
+      "skills": [
+        "debugging-and-error-recovery"
+      ],
+      "why": "a build, test or runtime failure, or a wrong value"
+    },
+    {
+      "id": "tests-dotnet",
+      "phase": "verify",
+      "when": {
+        "event": "tests",
+        "paths": [
+          "**/*.cs"
+        ]
+      },
+      "skills": [
+        "test-anti-patterns",
+        "assertion-quality"
+      ],
+      "why": "writing or changing .NET tests"
+    },
+    {
+      "id": "tests",
+      "phase": "verify",
+      "when": {
+        "event": "tests"
+      },
+      "skills": [
+        "test-driven-development"
+      ],
+      "why": "writing or changing tests; the user's rule on when tests are written overrides the skill's test-first order"
+    },
+    {
+      "id": "perf-dotnet",
+      "phase": "verify",
+      "when": {
+        "event": "perf",
+        "paths": [
+          "**/*.cs"
+        ]
+      },
+      "skills": [
+        "analyzing-dotnet-performance"
+      ],
+      "why": ".NET performance question"
+    },
+    {
+      "id": "perf",
+      "phase": "verify",
+      "when": {
+        "event": "perf"
+      },
+      "skills": [
+        "performance-optimization"
+      ],
+      "why": "performance question: measure first"
+    },
+    {
+      "id": "simplify",
+      "phase": "review",
+      "when": {
+        "event": "done"
+      },
+      "skills": [
+        "ponytail-review",
+        "deslop",
+        "unslop"
+      ],
+      "why": "before calling code done: over-engineering and code slop check on the diff, and AI tells out of every text the change adds (comments, UI copy, error messages, commit and PR text)"
+    },
+    {
+      "id": "review",
+      "phase": "review",
+      "when": {
+        "event": "review"
+      },
+      "skills": [
+        "code-review-and-quality"
+      ],
+      "why": "the user accepted a review"
+    },
+    {
+      "id": "review-ui",
+      "phase": "review",
+      "when": {
+        "event": "review",
+        "paths": [
+          "**/*.tsx",
+          "**/*.jsx",
+          "**/*.css",
+          "**/*.scss"
+        ]
+      },
+      "skills": [
+        "web-design-guidelines"
+      ],
+      "why": "UI review against the web interface guidelines"
+    },
+    {
+      "id": "security",
+      "phase": "review",
+      "when": {
+        "event": "review",
+        "paths": [
+          "**/*Auth*",
+          "**/*Permission*",
+          "**/*Capabilit*",
+          "**/*Token*",
+          "**/*Crypto*",
+          "**/*Payment*",
+          "**/Iam/**"
+        ]
+      },
+      "skills": [
+        "security-and-hardening",
+        "differential-review",
+        "sharp-edges"
+      ],
+      "why": "the change touches auth, permissions, secrets, crypto or money"
+    },
+    {
+      "id": "prose",
+      "phase": "review",
+      "when": {
+        "event": "prose"
+      },
+      "skills": [
+        "unslop"
+      ],
+      "why": "a spec, PR text, document or final summary is about to leave"
+    },
+    {
+      "id": "decision",
+      "phase": "review",
+      "when": {
+        "event": "decision"
+      },
+      "skills": [
+        "documentation-and-adrs"
+      ],
+      "why": "an architectural decision to record"
+    },
+    {
+      "id": "ship",
+      "phase": "ship",
+      "when": {
+        "event": "ship"
+      },
+      "skills": [
+        "git-workflow-and-versioning",
+        "shipping-and-launch"
+      ],
+      "why": "the user asked for a commit, push or pull request; the user's commit rules override the skill's"
+    }
+  ]
+}

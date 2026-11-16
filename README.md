@@ -1,163 +1,73 @@
 # narvai
 
-Türkçe · [English](README.en.md)
+A thin layer that makes coding agents work in your repositories the way a careful engineer would: the project's rules in front of them, the right skill at the moment it is needed, the checks run before "done", and nothing of the harness written into the repository.
 
-Claude Code, Codex, Antigravity, Orca ve isteğe bağlı olarak Hermes için tek bir geliştirme ortamı. Skill'ler, kurallar
-ve hafıza tek yerde durur, her agent aynı dosyaları okur. Claude Code'da kaydedilen bir karar Codex'te ya da
-Antigravity'de AgentMemory'den geri gelir. .NET ve React/Next.js işlerinde `narvai-orchestrator` isteğin niyetini okuyup
-doğru skill'leri seçer, store'u repo dışında tutar ve "done" kapısını (`verify` + pre-push) uygular.
+Works with Claude Code and Codex. Stack profiles exist for .NET and Next.js; another stack is one folder.
 
-## Nasıl çalışır
+## What is in it
+
+| Part | Where | What it does |
+|---|---|---|
+| Rules | `rules/core.md` + your `~/.narvai/rules.md` | One short generated rule file per agent (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`). |
+| CLI | `narvai.mjs`, `cli/` | The mechanical part: context, routing, checks, stale tests, graphs, doctor. |
+| Hook | `hooks/guard.mjs`, `hooks/deny.json` | One hook for both agents: refuses listed commands and says what to do instead, names the skills when a kind of file is edited for the first time, prints the repo context at session start. |
+| Routes | `registry/routes.json` | The lifecycle (define, plan, build, verify, review, ship) and which skills belong to which moment. |
+| Skills | `skills/`, `third-party/skills/` | Pinned, reviewed copies; source, commit and license in `third-party.json`. A small listed set is linked into the agents' skill folders. The rest is read by path when a route names it. |
+| Stack profiles | `profiles/<stack>/` | Detection, checks, language server, contract steps, and the rules a compiler cannot check. |
+| Agent profiles | `agents/` | Explore, implement and review subagents, written out for both agents. |
+| Store | outside every repository | Per-repository state, project rules, check overrides, graphs. |
+
+## Install
+
+Node 22 (or 20.17+) and git.
 
 ```
-Orca (çalışma alanı, worktree'ler)
-  ├─ Claude Code    Claude aboneliği, kendi CLI'ı
-  ├─ Codex          ChatGPT aboneliği, kendi CLI'ı
-  └─ Hermes         isteğe bağlı; ana model Codex (ChatGPT aboneliği)
-Antigravity, Pi     aynı skill'ler ve kurallar
-AgentMemory         hepsinin ortak, yerel hafızası (MCP; Hermes'te memory provider)
+node narvai.mjs install --root <dir>    # config, rule files, skill links, agents, hooks
+node narvai.mjs doctor                  # what is installed, what is stale, what is too big
 ```
 
-Her abonelik kendi resmi istemcisiyle kullanılır. Bir iş Claude Code'dan Codex'e geçtiğinde bağlam AgentMemory'den ve
-store'daki `PROGRESS.md`'den gelir.
+`--root` is where the store lives (`<dir>/Features/_harness`). A rule file narvai did not generate is left alone unless you pass `--adopt`; a backup is kept in `~/.narvai/backups`. In Codex, open `/hooks` once and trust the narvai entries.
 
-- Her skill'in tek fiziksel kopyası bu repodadır. `~/.claude/skills`, `~/.agents/skills` (Codex),
-  `~/.gemini/config/skills` (Antigravity) ve Pi'deki girdiler buraya junction'dır. Hermes `skills.external_dirs` ile
-  doğrudan okur.
-- Kuralların kaynağı `rules/GLOBAL.md` dosyasıdır. `sync` her agent'ın kural dosyasını buradan üretir ve `{{AI_ROOT}}`
-  yerine kurulum kökünü yazar.
-- Hafıza AgentMemory'dedir (`http://localhost:3111`, API anahtarı gerektirmez, embedding cihazda hesaplanır). Hermes onu
-  native memory provider olarak, diğer agent'lar MCP ile kullanır. Bütün repo'lar tek ortak hafıza alanını paylaşır (`~/.narvai/config.json` içinde `memoryProject`, varsayılan `shared`).
+Per repository: add its path and a store folder to `<storeRoot>/map.json`, then `node narvai.mjs hooks <repo>` for the git hooks (checks before push, a stale-test note at commit, graph refresh after commit).
 
-## Klasör düzeni
+## Yours, not the repository's
 
-Varsayılan kök `C:\Projects\AI`. Kurulumda `-Root` ile değiştirebilirsin.
-
-| Klasör | İçerik |
+| File | Purpose |
 |---|---|
-| `Harness` | bu repo: skill'ler, kurallar, hook'lar, script'ler |
-| `Features` | plan, spec, ADR, rapor, artifact ve `_harness` store'u |
-| `Memory` | AgentMemory verisi |
-| `Worktrees` | Orca'nın açtığı worktree'ler |
-| `Apps` | agent uygulama klasörleri (`scripts/move-app-homes.ps1` taşır) |
+| `~/.narvai/rules.md` | Your own rules, appended to the core rules. |
+| `~/.narvai/guard.json` | Your deny rules, same shape as `hooks/deny.json`. |
+| `<store>/<project>/project-rules.md` | Project rules. A first line `include: <path>` pulls in a shared file. |
+| `<store>/<project>/verify.json` | Replaces the profile's checks for that repository. |
 
-## Kurulum
+## Commands
 
-Önkoşul: Windows 11, PowerShell 7, node 22+, git ve winget.
-
-```powershell
-git clone https://github.com/mustafahantemur/narvai-orchestrator-skill.git C:\Projects\AI\Harness
-cd C:\Projects\AI\Harness
-.\install-dev-harness.ps1                       # kök C:\Projects\AI
-.\install-dev-harness.ps1 -Root D:\AI           # başka bir kök
-.\install-dev-harness.ps1 -ClaudeSubscription   # Hermes'te Claude aboneliği (bkz. Bilinen sınırlar)
-.\install-dev-harness.ps1 -DryRun               # yalnız planı gösterir
+```
+narvai context                      rules, stacks, checks, store and open work for this repo
+narvai next --event <name> [--paths ...]   the skills that belong to this moment
+narvai verify [--changed] [--tests] build, typecheck, lint; test checks only with --tests
+narvai tests [--failed <file>]      changed sources whose tests were not touched; which side changed last
+narvai contract                     the steps when an endpoint, DTO or enum changed
+narvai skill <name> | --list        where a skill is and what it is for
+narvai graph <build|status>         optional code graphs, built without a model
+narvai allow <rule-id>              a timed exception to a deny rule, when the user agrees
+narvai doctor [--fix]               installation and content checks
+narvai sync                         regenerate rule files, links, agents and hooks
 ```
 
-Bootstrap eksik olanları kurar, sonra `node narvai.mjs setup` çalıştırır.
+`node narvai.mjs` without a command lists all of them.
 
-| Bileşen | Kaynak |
-|---|---|
-| Claude Code | npm `@anthropic-ai/claude-code` |
-| Codex CLI | npm `@openai/codex` (Codex masaüstü uygulaması kuruluysa onun CLI'ı) |
-| Hermes | resmi kurulum betiği `hermes-agent.nousresearch.com/install.ps1` |
-| Orca | winget `StablyAI.Orca` |
-| Antigravity | winget `Google.Antigravity` |
-| AgentMemory | npm `@agentmemory/agentmemory@0.9.33` |
-| Pi, uv, RTK, OpenSpec, Spec Kit, Graphify | npm, winget ve uv |
+## How a skill gets used
 
-Araçları zaten kurulu bir makinede yalnız bağlantıları kurmak için:
+Nothing is loaded up front. The agent runs `narvai next --event <moment>` and reads only the files it prints. A route in `registry/routes.json` names an event, optional path globs and at most three skills. `registry/skills.json` records every skill on disk with a reviewed fit (`core`, `stack`, `on-demand`, `out`). To add or change a route, edit `routes.json` and run `narvai sync`; `narvai doctor` fails on a route that names a skill that does not exist.
 
-```powershell
-node narvai.mjs setup [--root D:\AI] [--claude-subscription] [--dry-run]
-```
+## Adding a stack
 
-`setup` her adımı ayrı dener. Yaptığını `OK`, atladığını `SKIP`, elle yapılacak işi `TODO` olarak yazar. Tekrar
-çalıştırmak güvenlidir ve değiştirdiği her dosyanın yedeğini `~/.narvai/backups` altına alır.
+Create `profiles/<name>/profile.json` (`detect`, `source`, `tests`, `checks`, `lsp`, `skills`, `contract`, `ignore`; copy an existing one) and `profiles/<name>/rules.md` with at most 25 lines of rules a linter or compiler cannot check. Add routes for its skills.
 
-### setup'ın yaptıkları
+## Code graphs
 
-- `install --adopt` config'i, skill junction'larını, kural dosyalarını ve Claude hook'larını kurar. Elle yazılmış bir
-  kural dosyası bulursa yedekleyip devralır.
-- AgentMemory için `.env`'i yazar (cihazda embedding, 8 temel MCP tool'u, veri klasörü, ortak kimlik `shared-dev`),
-  oturum açılışında server'ı başlatan zamanlanmış görevi kurar ve server'ı Claude Code, Codex ve Antigravity'ye MCP
-  olarak ekler. MCP köprüsü server kapalıysa ayrı bir depoya yazmaz, hata verir (`AGENTMEMORY_FORCE_PROXY=1`).
-- Hermes'te Claude ve Codex login'lerini ödünç almayı kapatır, skill klasörlerini ve Claude plugin skill'lerinin
-  görünümünü kurar, AgentMemory'yi memory provider yapar ve Context7 MCP'sini ekler. Config'de `adoOrg` varsa Azure
-  DevOps MCP'sini yazma tool'ları kapalı olarak ekler. Ana modeli Codex yapar (`openai-codex`, config'de `hermesModel`,
-  varsayılan `gpt-5.6-sol`); `--claude-subscription` bunun yerine Claude DirectSDK plugin'ini kurar ve ana model yapar.
-- Codex'te proje talimatı için `CLAUDE.md` fallback'ini açar, Claude içeriğini kopyalayan import sync'ini kapatır.
-- Orca kapalıysa Hermes argümanını `--yolo` yerine `--checkpoints` yapar, worktree klasörünü `<kök>\Worktrees` olarak
-  ayarlar ve varsayılan agent'ı Claude Code yapar (config'de `orcaDefaultAgent`: `claude`, `codex` ya da `hermes`).
+Optional. `narvai graph build` builds a Graphify graph per repository and Understand-Anything graphs per module from the repositories listed in `<storeRoot>/graph/repos.json`, without a model. Measured on a 6,000-file repository, they did not make answers more accurate or cheaper than search plus the language server; they help with cross-repository reach and with showing an area to a person. See `skills/narvai-orchestrator/references/graphs.md`.
 
-### Elle yapılacaklar
+## Updating a vendored skill set
 
-```powershell
-claude                                        # Claude Code'a giriş
-codex login                                   # Codex CLI'a giriş
-.\scripts\move-app-homes.ps1 -Apply           # tüm agent uygulamaları kapalıyken
-
-# yalnız Hermes kullanacaksan
-hermes auth add openai-codex --type oauth     # Hermes'in ana modeli Codex, ChatGPT aboneliğiyle giriş
-```
-
-Antigravity'yi bir kez açıp Google hesabınla giriş yap.
-
-## Günlük kullanım
-
-| İş | Nasıl |
-|---|---|
-| Agent'ı Orca'dan aç | Orca'da yeni sekme, agent Claude Code ya da Codex |
-| Oturuma devam et | `claude --resume <id>`, `codex resume`; Hermes'te `hermes -c` |
-| Agent değiştir | işi yeni sekmede öteki agent'la sürdür; bağlam AgentMemory ve `PROGRESS.md`'den gelir |
-| Hafızada ara | agent'a sor ya da `memory_recall`, `memory_smart_search` |
-| Karar kaydet | `DECISION <ID> \| topic: ... \| decision: ... \| status: current \| date: YYYY-MM-DD \| source: ...` |
-| Hafıza sağlığı | `agentmemory status`, görüntüleyici `http://localhost:3113` |
-| Skill ekle | klasörü `third-party/skills` altına koy, `third-party.json`'a yaz, `node narvai.mjs install` |
-| Kural değiştir | `rules/GLOBAL.md`'yi düzenle, `node narvai.mjs sync` |
-| Claude plugin güncellemesinden sonra | `node narvai.mjs setup` |
-| Durum | `node narvai.mjs doctor`, `agentmemory status`; Hermes için `hermes status` |
-
-Aynı tip ve ID ile kaydedilen karar eskisini supersede eder. Recall yalnız güncel kaydı döndürür.
-
-## Komutlar
-
-| Komut | Ne yapar |
-|---|---|
-| `setup [--root <dir>] [--claude-subscription] [--dry-run]` | `install --adopt`, ardından Hermes, AgentMemory, MCP, Codex ve Orca bağlantıları |
-| `install [--root <dir>] [--adopt]` | config, sync, vendor edilmiş üçüncü parti skill'ler (junction), Claude hook kayıtları |
-| `sync [--adopt]` | narvai skill'ini Claude, Codex, Antigravity ve Pi skill klasörlerine bağlar; `rules/GLOBAL.md`'den Claude, Codex, Antigravity, Pi ve Hermes kural dosyalarını üretir; Qwen pointer'ını yazar |
-| `doctor` | kurulu, eksik ya da bayat olanı listeler |
-| `usage [--days N]` | hangi skill'lerin gerçekten kullanıldığı |
-| `estimate <yollar>` | bir worker'ın okuyacağı şeyin token tahmini; sığar mı, bölünmeli mi |
-| `verify [--all] [--hook]` | repo'nun "done" tanımı (store'daki `verify.json` ya da stack varsayılanları) |
-| `hooks <repo>` | `verify --hook` koşan pre-push hook'u; mevcut hook korunur ve önce koşar |
-| `eval [--only=..] [--dry-run]` | `evals/scenarios.json`'u headless Claude Code ile koşar; yalnız abonelik girişiyle, API anahtarı varsa reddeder |
-
-## Repo içi klasörler
-
-- `skills/narvai-orchestrator/`: yönlendirici skill ve referansları.
-- `third-party/` ve `third-party.json`: incelenmiş, commit'e sabitlenmiş skill kopyaları (caveman, modern-web-guidance,
-  impeccable, dotnet ve diğerleri), kaynak repo ve yerel değişiklikler.
-- `rules/`: `GLOBAL.md` ortak kurallar, `hermes-identity.md` Hermes'e özel kimlik ve Claude tool adı eşlemesi.
-- `hooks/`: `narvai-guard.mjs` (narvai hatırlatması, subagent context sınırı), `store-context.mjs` (store ve iş kalemi),
-  `ua-auto-update.mjs` (commit sonrası kod grafiği).
-- `setup.mjs`: `narvai setup`'ın uyguladığı bağlantılar.
-- `install-dev-harness.ps1`: yeni makine kurulumu. `scripts/move-app-homes.ps1`: uygulama klasörlerini köke taşır.
-- `evals/`: davranış senaryoları. `templates/CLAUDE.md`: kullanıcı kuralları şablonu.
-
-## Bilinen sınırlar
-
-- Hermes'in AgentMemory plugin'i katalogda yalnız Linux ve macOS için listelenir. Windows'ta built-in `MEMORY.md`
-  yazımlarının aynalanması POSIX dosya kilidi istediği için çalışmaz. Kayıt, recall, arama ve konuşma yakalama çalışır.
-- Hermes'te Claude aboneliği varsayılan olarak kapalıdır, ana model Codex'tir. DirectSDK plugin'i değiştirilmemiş `claude` CLI'ını senin
-  login'inle çalıştırır, ama Anthropic aboneliğin üçüncü parti araçlardan kullanımını sınırlıyor ve bu kullanım ek ücretli
-  kullanıma (extra usage) düşebilir. Açmadan önce Anthropic'in koşullarını ve Team ya da Enterprise planda şirket
-  politikasını kontrol et. `node narvai.mjs setup --claude-subscription` plugin'i açar ve ana model yapar.
-- Orca açıkken ayar dosyasına yazılmaz. `setup` bunu `TODO` olarak bildirir.
-- caveman yalnız sohbet yanıtlarını kısaltır. Kod, commit, doküman ve hafıza kayıtları normal yazılır.
-
-## Lisans
-
-`third-party/` altındaki her skill kendi kaynağının lisansını taşır (klasördeki LICENSE ve `third-party.json`). Geri
-kalanı özel.
+Clone the source at the new commit, read what changed, copy only the listed skills over `third-party/skills`, re-apply the local changes recorded in `third-party.json`, update the commit there, run `node --test tests/*.test.mjs` and `narvai doctor`.

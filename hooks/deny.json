@@ -1,0 +1,22 @@
+{
+  "rules": [
+    {
+      "id": "root-find",
+      "command": "\\bfind\\s+(?:-[HLPO]\\S*\\s+)*[\"']?(?:/|[a-z]:[\\\\/]?|/[a-z]/?|/mnt/[a-z]/?)[\"']?(?=\\s|$|[;|&)])",
+      "reason": "Recursive search from a filesystem root runs for hours and outlives the agent.",
+      "instead": "search a named directory: the repo, or the folder that holds the target."
+    },
+    {
+      "id": "root-list",
+      "command": "\\b(?:Get-ChildItem|gci|dir|ls)\\b(?=[^;|&\\n]*\\s-r(?:ec\\w*)?\\b)[^;|&\\n]*\\s(?:-(?:Literal)?Path\\s+)?[\"']?(?:/|[a-z]:[\\\\/]?|/[a-z]/?|\\\\)[\"']?(?=\\s|$|[;|&)])",
+      "reason": "Recursive listing from a drive root runs for hours and outlives the agent.",
+      "instead": "list a named directory: the repo, or the folder that holds the target."
+    },
+    {
+      "id": "root-grep",
+      "command": "\\b(?:rg|grep\\b(?=[^;|&\\n]*\\s(?:-[a-z]*r[a-z]*|--recursive)\\b))\\b[^;|&\\n]*\\s[\"']?(?:/|[a-z]:[\\\\/]?|/[a-z]/?|/mnt/[a-z]/?)[\"']?(?=\\s|$|[;|&)])",
+      "reason": "Recursive content search from a filesystem root runs for hours and outlives the agent.",
+      "instead": "search a named directory: the repo, or the folder that holds the target."
+    }
+  ]
+}

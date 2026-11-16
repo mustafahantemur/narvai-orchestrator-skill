@@ -3,6 +3,8 @@
   "skillLibrary": "~/.claude/skills",
   "sources": [
     {
+      "set": "dotnet",
+      "license": "MIT (SKILL.md frontmatter)",
       "repo": "dotnet/skills",
       "commit": "96c3d68",
       "skills": [
@@ -23,6 +25,8 @@
       ]
     },
     {
+      "set": "vercel",
+      "license": "MIT (SKILL.md frontmatter)",
       "repo": "vercel-labs/agent-skills",
       "commit": "1a2c79d",
       "skills": [
@@ -35,6 +39,8 @@
       ]
     },
     {
+      "set": "supabase",
+      "license": "MIT (SKILL.md frontmatter)",
       "repo": "supabase/agent-skills",
       "commit": "c9be0e9",
       "skills": [
@@ -42,6 +48,8 @@
       ]
     },
     {
+      "set": "trailofbits",
+      "license": "CC-BY-SA-4.0 (GitHub API; no license text in the vendored copies)",
       "repo": "trailofbits/skills",
       "commit": "e4dd0bb",
       "skills": [
@@ -62,6 +70,8 @@
       ]
     },
     {
+      "set": "playwright",
+      "license": "unverified",
       "repo": "microsoft/playwright-cli",
       "commit": "9c95a50",
       "skills": [
@@ -73,6 +83,8 @@
       "done": "which:playwright-cli"
     },
     {
+      "set": "understand-anything",
+      "license": "MIT (upstream README; not read from a LICENSE file)",
       "repo": "Egonex-AI/Understand-Anything",
       "commit": "182c7fb",
       "skills": [
@@ -92,6 +104,8 @@
       "done": "path:~/.understand-anything-plugin"
     },
     {
+      "set": "impeccable",
+      "license": "Apache-2.0 (impeccable/LICENSE)",
       "repo": "pbakaus/impeccable",
       "commit": "ec229b4",
       "skills": [
@@ -102,37 +116,53 @@
       ]
     },
     {
-      "repo": "unknown (vendored as found, 2026-11-11)",
-      "commit": "-",
+      "set": "karpathy",
+      "repo": "forrestchang/andrej-karpathy-skills",
+      "commit": "2c60614",
+      "license": "MIT (upstream README and SKILL.md frontmatter; upstream has no LICENSE file)",
       "skills": [
         "karpathy-guidelines"
+      ],
+      "localChanges": [
+        "none: SKILL.md is byte-identical to skills/karpathy-guidelines at 2c60614"
       ]
     },
     {
+      "set": "graphify",
       "repo": "graphify CLI (uv tool graphifyy; written by `graphify install --platform claude`)",
       "commit": "-",
       "skills": [
         "graphify"
-      ]
+      ],
+      "license": "unverified"
     },
     {
-      "repo": "unknown (vendored as found, 2026-11-16)",
-      "commit": "-",
+      "set": "rea",
+      "repo": "morluto/rea",
+      "commit": "7484401",
+      "license": "MIT (reverse-engineer-anything/LICENSE, copied from upstream)",
       "skills": [
         "reverse-engineer-anything"
+      ],
+      "localChanges": [
+        ".agents/skills/reverse-engineer-anything at 7484401, unchanged; LICENSE added from the repo root"
       ]
     },
     {
+      "set": "caveman",
+      "license": "Apache-2.0 (caveman/LICENSE)",
       "repo": "JuliusBrussee/caveman",
       "commit": "9b24366",
       "skills": [
         "caveman"
       ],
       "localChanges": [
-        "skills/caveman only (SKILL.md, README.md, LICENSE): no hooks, statusline or sibling skills; narvai-orchestrator activates it once per session"
+        "skills/caveman only (SKILL.md, README.md, LICENSE): no hooks, statusline or sibling skills; listed; agent-to-agent reports follow its style"
       ]
     },
     {
+      "set": "modern-web-guidance",
+      "license": "Apache-2.0 (modern-web-guidance/LICENSE)",
       "repo": "GoogleChrome/modern-web-guidance",
       "commit": "4dd9683",
       "skills": [
@@ -141,17 +171,155 @@
       "localChanges": [
         "skills/modern-web-guidance only (SKILL.md, guides/, LICENSE); the skill itself calls `npx modern-web-guidance@latest` for search/retrieve"
       ]
+    },
+    {
+      "set": "agent-skills",
+      "repo": "addyosmani/agent-skills",
+      "commit": "39b723c",
+      "version": "0.6.16",
+      "license": "MIT (LICENSE copied into each skill folder)",
+      "skills": [
+        "api-and-interface-design",
+        "browser-testing-with-devtools",
+        "ci-cd-and-automation",
+        "code-review-and-quality",
+        "code-simplification",
+        "constraint-driven-development",
+        "context-engineering",
+        "debugging-and-error-recovery",
+        "deprecation-and-migration",
+        "documentation-and-adrs",
+        "doubt-driven-development",
+        "frontend-ui-engineering",
+        "git-workflow-and-versioning",
+        "idea-refine",
+        "incremental-implementation",
+        "interview-me",
+        "observability-and-instrumentation",
+        "performance-optimization",
+        "planning-and-task-breakdown",
+        "security-and-hardening",
+        "shipping-and-launch",
+        "source-driven-development",
+        "spec-driven-development",
+        "test-driven-development",
+        "using-agent-skills"
+      ],
+      "localChanges": [
+        "skills/ only: no hooks, commands, agents or session-start script",
+        "links to the repo-root references/*.md were rewritten to a copy inside each skill's own references/ folder"
+      ]
+    },
+    {
+      "set": "pstack",
+      "repo": "michael-denyer/pstack-claude",
+      "commit": "2044f18",
+      "version": "0.9.138",
+      "license": "MIT (LICENSE in each skill folder; NOTICE and the Cursor licenses in poteto-mode/references/licenses, the Cursor license also beside the skills it covers)",
+      "skills": [
+        "architect",
+        "arena",
+        "automate-me",
+        "babysit",
+        "benchmark-checklist",
+        "blast-radius",
+        "bro",
+        "correct",
+        "create-formal-verification-skill",
+        "create-verification-skill",
+        "deslop",
+        "figure-it-out",
+        "fix-ci",
+        "fix-merge-conflicts",
+        "get-pr-comments",
+        "how",
+        "in-your-own-words",
+        "interrogate",
+        "ketchup",
+        "ketchup-video",
+        "maintain-formal-verification-skill",
+        "maintain-verification-skill",
+        "make-pr-easy-to-review",
+        "no-comments",
+        "poteto-help",
+        "poteto-mode",
+        "principle-attack-the-premise",
+        "principle-boundary-discipline",
+        "principle-build-the-lever",
+        "principle-encode-lessons-in-structure",
+        "principle-exhaust-the-design-space",
+        "principle-experience-first",
+        "principle-explain-the-number",
+        "principle-fix-root-causes",
+        "principle-foundational-thinking",
+        "principle-guard-the-context-window",
+        "principle-laziness-protocol",
+        "principle-make-operations-idempotent",
+        "principle-migrate-callers-then-delete-legacy-apis",
+        "principle-minimize-reader-load",
+        "principle-model-the-domain",
+        "principle-never-block-on-the-human",
+        "principle-outcome-oriented-execution",
+        "principle-prove-it-works",
+        "principle-redesign-from-first-principles",
+        "principle-separate-before-serializing-shared-state",
+        "principle-sequence-verifiable-units",
+        "principle-subtract-before-you-add",
+        "principle-test-behavior-not-implementation",
+        "principle-type-system-discipline",
+        "recall",
+        "reflect",
+        "setup-pstack",
+        "sharpen",
+        "show-me-your-work",
+        "statechart",
+        "swarm",
+        "tdd",
+        "teach",
+        "technical-writing",
+        "thermo-nuclear-code-quality-review",
+        "thermo-nuclear-review",
+        "thermos",
+        "typescript-best-practices",
+        "unslop",
+        "what-did-i-get-done",
+        "why"
+      ],
+      "localChanges": [
+        "plugins/pstack/skills only: no hooks, agents, models.json or session-start script"
+      ]
+    },
+    {
+      "set": "ponytail",
+      "repo": "DietrichGebert/ponytail",
+      "commit": "96608e0",
+      "version": "5.3.3",
+      "license": "MIT (LICENSE copied into each skill folder)",
+      "skills": [
+        "ponytail",
+        "ponytail-audit",
+        "ponytail-debt",
+        "ponytail-gain",
+        "ponytail-help",
+        "ponytail-review"
+      ],
+      "localChanges": [
+        "skills/ only: no hooks, MCP server, commands or session-start script"
+      ]
     }
   ],
   "plugins": {
-    "about": "Claude Code plugins narvai routes to (agent-skills from addy-agent-skills, LSP from claude-plugins-official); install with /plugin, not vendored.",
-    "names": [
+    "about": "Claude Code and Codex plugins. `keep` stays a plugin (install with /plugin). `off` is turned off by `narvai sync` in both harnesses: agent-skills, pstack and ponytail are vendored above; mattpocock-skills and superpowers are dropped and not vendored.",
+    "keep": [
+      "csharp-lsp",
+      "typescript-lsp"
+    ],
+    "off": [
       "agent-skills",
       "pstack",
       "ponytail",
       "mattpocock-skills",
-      "csharp-lsp",
-      "typescript-lsp"
+      "superpowers"
     ]
   },
   "tools": {

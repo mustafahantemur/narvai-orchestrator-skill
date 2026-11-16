@@ -38,7 +38,7 @@
       "repo": "dotnet",
       "prompt": "dagitim ayari hep 0 geliyor neden olabilir bi bakar misin",
       "why": "Bug: a diagnosing skill, root cause before a fix.",
-      "skillsAny": ["mattpocock-skills:diagnosing-bugs", "agent-skills:debugging-and-error-recovery"]
+      "skillsAny": ["debugging-and-error-recovery"]
     },
     {
       "id": "no-commit-unasked",

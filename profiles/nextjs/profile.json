@@ -1,0 +1,26 @@
+{
+  "name": "nextjs",
+  "detect": ["**/next.config.js", "**/next.config.mjs", "**/next.config.cjs", "**/next.config.ts"],
+  "source": ["**/*.ts", "**/*.tsx"],
+  "tests": {
+    "paths": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx", "**/__tests__/**", "tests/**"],
+    "pairs": [{ "from": "(?<name>[\\w.-]+)\\.(?<ext>tsx?)$", "to": "${name}.test.${ext}" }]
+  },
+  "checks": [
+    { "name": "typecheck", "scripts": ["typecheck", "type-check", "tsc"], "run": "npx tsc --noEmit", "when": ["**/*.ts", "**/*.tsx"] },
+    { "name": "lint", "scripts": ["lint"], "when": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.mjs", "**/*.json"] },
+    { "name": "tests", "scripts": ["test"], "when": ["**/*.ts", "**/*.tsx"], "scope": "src/*/*", "kind": "test" }
+  ],
+  "lsp": { "server": "typescript-language-server", "needs": "the session opened at the folder that holds tsconfig.json" },
+  "skills": ["impeccable", "modern-web-guidance", "vercel-react-best-practices"],
+  "contract": {
+    "paths": ["**/*.generated.ts", "**/openapi*.json", "**/openapi*.yaml"],
+    "steps": [
+      "The backend change is in a backend the user started; it merges first or together with this one.",
+      "Regenerate the client types: `{script:api:generate|generate:api|openapi|codegen}`. Generated files are never edited by hand.",
+      "Drift check against the real schema URL: `{script:api:drift-check|api:drift|drift-check}`. A drift check that skips for lack of a URL proves nothing.",
+      "Callers and validation schemas follow the new types; `{check:typecheck}`. Two PRs in one merge window, each naming the other."
+    ]
+  },
+  "ignore": ["**/node_modules/**", "**/.next/**", "**/out/**", "**/*.generated.ts"]
+}

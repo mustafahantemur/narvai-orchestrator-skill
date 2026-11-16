@@ -1,0 +1,25 @@
+{
+  "name": "dotnet",
+  "detect": ["*.sln", "*.slnx", "**/*.csproj"],
+  "source": ["**/*.cs"],
+  "tests": {
+    "paths": ["**/*Tests.cs", "**/*Test.cs", "**/*.Tests/**", "tests/**"],
+    "pairs": [{ "from": "(?<name>\\w+)\\.cs$", "to": "${name}Tests.cs" }]
+  },
+  "checks": [
+    { "name": "build", "run": "dotnet build -nodeReuse:false -v:q", "when": ["**/*.cs", "**/*.csproj", "**/*.props", "**/*.targets", "**/*.sln", "**/*.slnx"] },
+    { "name": "tests", "run": "dotnet test --no-build -v:q", "when": ["**/*.cs"], "scope": "tests/*", "kind": "test" }
+  ],
+  "lsp": { "server": "csharp-ls", "needs": "the session opened at the folder that holds the solution file; the first query waits for the solution to load" },
+  "skills": ["csharp-refactoring", "optimizing-ef-core-queries", "dotnet-webapi", "supabase-postgres-best-practices"],
+  "contract": {
+    "paths": ["**/*Endpoints.cs", "**/*Controller.cs", "**/Dtos/**", "**/*Dto.cs", "**/*Request.cs", "**/*Response.cs", "**/Enums/**"],
+    "steps": [
+      "Backend first: the endpoint with its OpenAPI metadata and tests; `{check:build}`, then `{check:tests}`.",
+      "Regenerate the client types in the consuming repo from a backend that has this change. The user starts the backend; generated files are never edited by hand.",
+      "Drift check the client against the real schema URL. A drift check that skips for lack of a URL proves nothing.",
+      "Two PRs in one merge window, each naming the other. The backend merges first or together; a breaking change keeps the old shape until the client that drops it is merged."
+    ]
+  },
+  "ignore": ["**/bin/**", "**/obj/**", "**/Migrations/**"]
+}

@@ -1,25 +1,21 @@
 // Bir ekosistemin bütün repoları için iki graph'ı da model çağırmadan üretir:
 // Graphify (ajanların yapısal haritası, repo başına + birleşik) ve Understand-Anything (kök başına).
 // Repo listesi harness'ta değil store'da durur: <storeRoot>/graph/repos.json
-// Kullanım: node ekosistem.mjs [--only <repo>] [--skip-graphify] [--skip-ua] [--no-fetch]
+// Kullanım: node ekosistem.mjs [--only <repo>] [--head] [--merge] [--skip-graphify] [--skip-ua] [--no-fetch]
+// --merge: tek başına yalnız birleşik graph'ı kurar; --only ile birlikte o repodan sonra birleştirir.
+// --head: dalın origin ref'i yerine kaynak reponun o anki HEAD'i (git hook'ları bunu kullanır).
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { storeRoot } from '../../cli/ortak.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)).replace(/\\/g, '/');
 const argv = process.argv.slice(2);
 const flag = (k) => argv.includes('--' + k);
 const only = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : null;
 
-const cfgPath = path.join(os.homedir(), '.narvai', 'config.json');
-const storeRoot = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')).storeRoot : null;
-if (!storeRoot) {
-  console.error(`storeRoot bulunamadı: ${cfgPath}`);
-  process.exit(1);
-}
-const GRAPH = `${storeRoot.replace(/\\/g, '/')}/graph`;
+const GRAPH = `${storeRoot().replace(/\\/g, '/')}/graph`;
 const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2));
 const list = readJson(`${GRAPH}/repos.json`);
@@ -37,9 +33,9 @@ const seconds = (t) => Math.round((Date.now() - t) / 1000);
 function syncClone(repo) {
   const clone = `${GRAPH}/${repo.name}`;
   if (!fs.existsSync(`${clone}/.git`)) execFileSync('git', ['clone', '--quiet', '--shared', '--no-checkout', repo.path, clone]);
-  if (!flag('no-fetch') && tryGit(repo.path, 'fetch', '--quiet', 'origin') === null) console.warn(`  uyarı: ${repo.name} origin'den çekilemedi, yerel ref kullanılıyor`);
+  if (!flag('no-fetch') && !flag('head') && tryGit(repo.path, 'fetch', '--quiet', 'origin') === null) console.warn(`  uyarı: ${repo.name} origin'den çekilemedi, yerel ref kullanılıyor`);
   const branch = repo.branch || list.branch || 'development';
-  const ref =
+  const ref = flag('head') ? 'HEAD' :
     [`refs/remotes/origin/${branch}`, 'refs/remotes/origin/HEAD', 'HEAD'].find((r) => tryGit(repo.path, 'rev-parse', '--verify', '--quiet', r) !== null);
   const commit = git(repo.path, 'rev-parse', ref);
   git(clone, 'fetch', '--quiet', repo.path, commit);
@@ -60,7 +56,7 @@ function expandRoots(repo, clone) {
 }
 
 const results = [];
-for (const repo of list.repos.filter((r) => !only || r.name === only)) {
+for (const repo of flag('merge') && !only ? [] : list.repos.filter((r) => !only || r.name === only)) {
   const started = Date.now();
   const row = { repo: repo.name, ua: [], errors: [] };
   results.push(row);
@@ -111,8 +107,8 @@ index.graphify = [
   ...results.filter((r) => r.graphify).map((r) => ({ repo: r.repo, commit: r.commit, builtAt: new Date().toISOString(), ...r.graphify })),
 ].sort((a, b) => a.repo.localeCompare(b.repo));
 
-// Birleşik graph her çalıştırmada bütün repolardan yeniden kurulur; tek repo güncellense de eskimez.
-if (!flag('skip-graphify') && index.graphify.length > 1) {
+// Birleşik graph bütün repolardan yeniden kurulur. --only ile atlanır (git hook'ları her commit'te ödemesin); --merge ister.
+if (!flag('skip-graphify') && (!only || flag('merge')) && index.graphify.length > 1) {
   fs.mkdirSync(`${GRAPH}/ekosistem`, { recursive: true });
   const out = `${GRAPH}/ekosistem/graph.json`;
   const r = spawnSync('graphify', ['merge-graphs', ...index.graphify.map((g) => `${GRAPH}/${g.graph}`), '--out', out], {
