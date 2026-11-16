@@ -94,16 +94,18 @@ foreach ($r in $rows | Where-Object State -eq 'move') {
   } catch { Write-Host "FAILED $($r.From): $($_.Exception.Message) (left in place)" -ForegroundColor Red }
 }
 
-# Orca is closed here, so its settings file can be edited safely: new worktrees under the root, Hermes without --yolo.
+# Orca keeps its profile in SQLite and mirrors it to orca-data.json; editing the JSON makes Orca ask which copy to keep
+# on its next start. Write only when a value really differs, and answer "Use JSON" in that dialog.
 $orcaData = Join-Path $AppsRoot 'orca-appdata\profiles\local-default\orca-data.json'
 if (Test-Path $orcaData) {
-  Copy-Item $orcaData "$orcaData.before-move-app-homes"
   node -e @"
-const fs=require('fs');const p=process.argv[1];const d=JSON.parse(fs.readFileSync(p,'utf8'));
-d.settings.workspaceDir='$wt';
-d.settings.workspaceDirHistory=[...new Set(['$wt',...(d.settings.workspaceDirHistory||[])])];
-d.settings.agentDefaultArgs={...d.settings.agentDefaultArgs,hermes:'--checkpoints'};
-fs.writeFileSync(p,JSON.stringify(d));console.log('orca: workspaceDir + hermes args set');
+const fs=require('fs');const p=process.argv[1];const d=JSON.parse(fs.readFileSync(p,'utf8'));const s=d.settings;
+if (s.workspaceDir==='$wt' && s.agentDefaultArgs?.hermes==='--checkpoints') { console.log('orca: settings current'); process.exit(0); }
+fs.copyFileSync(p, p+'.before-move-app-homes');
+s.workspaceDir='$wt';
+s.workspaceDirHistory=[...new Set(['$wt',...(s.workspaceDirHistory||[])])];
+s.agentDefaultArgs={...s.agentDefaultArgs,hermes:'--checkpoints'};
+fs.writeFileSync(p,JSON.stringify(d));console.log('orca: workspaceDir + hermes args set (choose "Use JSON" if Orca asks)');
 "@ $orcaData
 }
 if ($stoppedMemory) { Start-ScheduledTask -TaskName 'AgentMemory (unified-harness)' -ErrorAction SilentlyContinue }
