@@ -20,7 +20,7 @@
       .\setup-dev-harness.ps1 -StoreHook On|Off           # auto-activate the store at session start
 
     Nothing is ever written inside a repository: no .ai/, no .gitignore edits.
-    Stores live under $env:AI_HARNESS_MEMORY, default C:\Projects\Features\_harness, named after the project.
+    Stores live under $env:AI_HARNESS_MEMORY, default C:\Projects\AI\Features\_harness, named after the project.
 #>
 [CmdletBinding()]
 param(
@@ -41,7 +41,7 @@ $ErrorActionPreference = 'Continue'
 
 # Memory lives OUTSIDE every repository. Nothing is written into a project tree.
 # Override with $env:AI_HARNESS_MEMORY; default is <script dir>\memory.
-$MemoryRoot = if ($env:AI_HARNESS_MEMORY) { $env:AI_HARNESS_MEMORY } else { 'C:\Projects\Features\_harness' }
+$MemoryRoot = if ($env:AI_HARNESS_MEMORY) { $env:AI_HARNESS_MEMORY } else { 'C:\Projects\AI\Features\_harness' }
 $MemoryMap  = Join-Path $MemoryRoot 'map.json'
 
 $ClaudeHome = Join-Path $HOME '.claude'

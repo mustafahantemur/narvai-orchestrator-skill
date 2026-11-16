@@ -20,7 +20,7 @@ shared clone in the store:
 - graph: `<store>/understand/src/.ua/knowledge-graph.json`, or per module
   `<store>/understand/src/src/Modules/<Modül>/.ua/knowledge-graph.json`
 
-`<store>` comes from the SessionStart line or `C:\Projects\Features\_harness\map.json`.
+`<store>` comes from the SessionStart line or `<storeRoot>\map.json` (`storeRoot` in `~/.narvai/config.json`).
 
 ## Answering (cheap, every time)
 
@@ -48,7 +48,7 @@ By goal:
 - **A business flow:** `domain-graph.json` in the store copy if present; building it is `understand-domain`
   run against the store copy, and it dispatches an agent (Heavy Mode).
 - **An onboarding guide:** method of `understand-onboard`. Save only when asked, to
-  `C:\Projects\Features\<proje>\...`, never `docs/UA_ONBOARDING.md` in the repo.
+  `<docsRoot>\<proje>\...`, never `docs/UA_ONBOARDING.md` in the repo.
 
 ## Building the graph (Heavy Mode: name the cost, get a yes)
 
@@ -102,7 +102,7 @@ Report in one line what ran. To turn it off for a graph, set `autoUpdate: false`
   Skip its first path, which downloads and runs a viewer tarball from GitHub; use the local Vite path from
   the installed plugin, which was reviewed and built from the lockfile. Name the running server and its URL.
 - **`understand-knowledge`** builds a graph of a markdown wiki or docs folder. Point it at a folder under
-  `C:\Projects\Features\...` or a store copy, never a repo. It writes `.ua/` into the target and dispatches
+  `<docsRoot>\...` or a store copy, never a repo. It writes `.ua/` into the target and dispatches
   agents (Heavy Mode).
 - **`understand-figma`** builds a design graph of a Figma file. It calls `api.figma.com` with a token from the
-  environment and dispatches agents (Heavy Mode). Run it in a folder under `C:\Projects\Features\...`.
+  environment and dispatches agents (Heavy Mode). Run it in a folder under `<docsRoot>\...`.

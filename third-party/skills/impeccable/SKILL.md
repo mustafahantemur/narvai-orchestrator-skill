@@ -16,7 +16,7 @@ detector engine, the hooks and the plugin agents are not installed.
   `live*`, `hooks`, `pin`, `doctor`, `concept-seed`). Treat the detector as missing: check the code yourself
   against `reference/craft-floor.md`. Do not print the "Context loading did not run" message.
 - **Nothing is written into a repo** for this skill: no `.impeccable/`, PRODUCT.md or DESIGN.md. A report is
-  the reply; if it must be kept, it goes to `C:\Projects\Features\<project>\...`.
+  the reply; if it must be kept, it goes to `<docsRoot>\<project>\...`.
 - **Sub-agents:** ask the user before dispatching any (critique's Assessment A/B included). Without a yes,
   run the assessments in this context, one after another, with the degraded banner.
 - **Commands `live` and `generate`** need the engine; they are not available here.

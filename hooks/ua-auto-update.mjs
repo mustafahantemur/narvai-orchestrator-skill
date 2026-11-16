@@ -7,7 +7,9 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 
-const MAP_PATH = process.env.UA_HARNESS_MAP ?? 'C:/Projects/Features/_harness/map.json';
+const cfgPath = join(homedir(), '.narvai', 'config.json');
+const storeRoot = existsSync(cfgPath) ? JSON.parse(readFileSync(cfgPath, 'utf8')).storeRoot : undefined;
+const MAP_PATH = process.env.UA_HARNESS_MAP ?? (storeRoot ? join(storeRoot, 'map.json') : 'C:/Projects/AI/Features/_harness/map.json');
 const PLUGIN_ROOT = process.env.UA_PLUGIN_ROOT ?? join(homedir(), '.understand-anything-plugin');
 const GIT_CHANGE = /\bgit\s+(?:-C\s+("[^"]+"|'[^']+'|\S+)\s+)?(?:commit|merge|pull|rebase|cherry-pick)\b/;
 

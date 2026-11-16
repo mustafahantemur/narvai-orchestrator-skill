@@ -107,6 +107,40 @@
       "skills": [
         "karpathy-guidelines"
       ]
+    },
+    {
+      "repo": "graphify CLI (uv tool graphifyy; written by `graphify install --platform claude`)",
+      "commit": "-",
+      "skills": [
+        "graphify"
+      ]
+    },
+    {
+      "repo": "unknown (vendored as found, 2026-11-16)",
+      "commit": "-",
+      "skills": [
+        "reverse-engineer-anything"
+      ]
+    },
+    {
+      "repo": "JuliusBrussee/caveman",
+      "commit": "9b24366",
+      "skills": [
+        "caveman"
+      ],
+      "localChanges": [
+        "skills/caveman only (SKILL.md, README.md, LICENSE): no hooks, statusline or sibling skills; narvai-orchestrator activates it once per session"
+      ]
+    },
+    {
+      "repo": "GoogleChrome/modern-web-guidance",
+      "commit": "4dd9683",
+      "skills": [
+        "modern-web-guidance"
+      ],
+      "localChanges": [
+        "skills/modern-web-guidance only (SKILL.md, guides/, LICENSE); the skill itself calls `npx modern-web-guidance@latest` for search/retrieve"
+      ]
     }
   ],
   "plugins": {

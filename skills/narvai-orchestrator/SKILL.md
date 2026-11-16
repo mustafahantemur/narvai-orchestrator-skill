@@ -17,8 +17,12 @@ final answer of the turn ends with one line listing the skills used (narvai-orch
 
 **Required skill calls.** For each line that fits the request, call the Skill tool right after this skill and
 before reading code for it. Naming a skill or "following its flow" without calling it does not count.
+- First reply of the session (again after compaction): `caveman`, the reply voice from then on. It shortens chat
+  prose only: the user's language, technical terms, code, commands, paths and errors stay exact, and anything
+  persisted (code, comments, commits, specs, docs, memory) is written in normal prose.
 - UI work, a plan for it included (page, dialog, form, component, layout): the design skill named in the project
-  profile's `## UI` (read the profile first), then `impeccable`.
+  profile's `## UI` (read the profile first), then `impeccable`, then `modern-web-guidance` (search, then retrieve
+  the guide for the web-platform pattern before writing HTML, CSS or client-side JS).
 - A bug, a failure or a wrong value: `mattpocock-skills:diagnosing-bugs`.
 - About to write code: `karpathy-guidelines`.
 - An endpoint, DTO, enum or error code changes: read `references/delivery.md`; the plan names all four steps:
@@ -67,11 +71,12 @@ A skill that is never loaded is never applied; "always active" alone failed in p
 
 | Checkpoint | Invoke | Size |
 |---|---|---|
+| First reply of the session, and again after compaction | `caveman`: chat replies get its voice until the user says "stop caveman" or "normal mode"; persisted text never does | all |
 | Route chosen, no spec exists yet | `agent-skills:spec-driven-development` (revising an existing spec skips it) | STANDARD+ |
 | First read of an unfamiliar subsystem | the Understand-Anything graph when the store has `understand/src/.ua/knowledge-graph.json` (`references/understand-anything.md`); else one bounded `graphify` query when the store has `graphify/graph.json` (the SessionStart line names it); else targeted grep → `references/repo-intelligence.md` | STANDARD+ |
 | Finding where a symbol is defined, who calls it, its references or implementations, its type | the `LSP` tool first: `csharp-ls` for `.cs`, `typescript-language-server` (with the Next.js plugin from `tsconfig`) for `.ts/.tsx`. Grep is for text, strings, config and other languages, or when LSP returns nothing. C# needs the session opened in the repo that holds the `.slnx`; the first query waits ~90 s for the solution to load (measured 2026-11-11). If LSP is unavailable for a repo, say so | all |
 | Before writing code | `karpathy-guidelines`; `ponytail` runs through its SessionStart hook, invoke `ponytail:ponytail` only if that line is missing | all |
-| Planning or writing UI (a page, dialog, form, component or layout change), including a plan that only describes it | the design skill named in the project profile, and `impeccable` (its local-install block keeps the project's design system first); the plan or reply shows four lines before any code: the page pattern (archetype), the one primary action, the states (loading, empty, error, no permission), the ~344 px layout; then the done check in `house-rules-frontend.md` rule 12. A one-class visual tweak needs only the project design skill | all |
+| Planning or writing UI (a page, dialog, form, component or layout change), including a plan that only describes it | the design skill named in the project profile, `impeccable` (its local-install block keeps the project's design system first), and `modern-web-guidance` for each web-platform pattern the change uses (search, retrieve, apply its fallbacks; the project's design system still wins); the plan or reply shows four lines before any code: the page pattern (archetype), the one primary action, the states (loading, empty, error, no permission), the ~344 px layout; then the done check in `house-rules-frontend.md` rule 12. A one-class visual tweak needs only the project design skill | all |
 | Before prose leaves (spec, PROGRESS, PR body, docs, the final summary) | `pstack:unslop` | all |
 | A bug, a failure or a wrong value is reported | invoke `mattpocock-skills:diagnosing-bugs` (or `agent-skills:debugging-and-error-recovery`) when the diagnosis starts, before reading code for it; it drives reproduce → root cause → fix | all |
 | An endpoint, DTO, enum or error code changes | the plan names all four steps: backend first, regenerate the frontend types, drift check against the schema URL, two PRs in one merge window → `references/delivery.md` | all |

@@ -9,21 +9,27 @@
     from every host.
 
     Usage:
-      .\install-dev-harness.ps1                 # install everything missing
-      .\install-dev-harness.ps1 -DryRun         # show what it would do, change nothing
-      .\install-dev-harness.ps1 -SkipTools      # config only, assume the CLIs are already there
+      .\install-dev-harness.ps1                          # install everything missing under C:\Projects\AI
+      .\install-dev-harness.ps1 -Root D:\AI              # another root (Harness, Features, Memory, Worktrees, Apps)
+      .\install-dev-harness.ps1 -ClaudeSubscription      # also make Claude (subscription, DirectSDK) Hermes' model
+      .\install-dev-harness.ps1 -DryRun                  # show what it would do, change nothing
+      .\install-dev-harness.ps1 -SkipTools               # config only, assume the CLIs are already there
       .\install-dev-harness.ps1 -MemoryRoot D:\ai-memory
 
+    Installs what is missing: Claude Code, Codex, Hermes, Orca, Antigravity, AgentMemory, Pi and the tools,
+    then runs `node narvai.mjs setup`, which wires them to one harness (skills, rules, memory, MCP).
+
     What it does NOT do (you do these by hand, it tells you at the end):
-      - log in to Claude Code / Codex
+      - log in to Claude Code, Codex, Antigravity and Hermes' Codex provider
       - configure Pi provider credentials
-      - install the Orca desktop app
 #>
 [CmdletBinding()]
 param(
     [switch]$DryRun,
     [switch]$SkipTools,
-    [string]$MemoryRoot
+    [string]$MemoryRoot,
+    [string]$Root = 'C:\Projects\AI',
+    [switch]$ClaudeSubscription
 )
 
 $ErrorActionPreference = 'Continue'
@@ -123,8 +129,25 @@ else {
 }
 $Manual.Add('Pi: it has no credentials until you add them. Check with: pi auth check --provider anthropic')
 
-if (Have 'orca') { Ok "orca $(orca --version)" }
-else { Warn 'Orca not found - optional. It is a desktop app, install it yourself if you want worktree/fleet UI.'; $Manual.Add('Orca (optional): install the desktop app from stablyai/orca.') }
+if (Have 'hermes') { Ok "hermes $((hermes --version | Select-Object -First 1))" }
+else {
+    Step 'installing Hermes (official installer: hermes-agent.nousresearch.com/install.ps1)' { iex (irm 'https://hermes-agent.nousresearch.com/install.ps1') }
+    $Manual.Add('Hermes: open a new terminal so `hermes` resolves, then rerun this script.')
+}
+$Manual.Add('Hermes + ChatGPT subscription: hermes auth add openai-codex --type oauth, then: hermes fallback add')
+
+$winget = @(
+    @{ Id = 'StablyAI.Orca';      Name = 'Orca';        Probe = { Have 'orca' -or (Test-Path "$env:LOCALAPPDATA\Programs\orca") } }
+    @{ Id = 'Google.Antigravity'; Name = 'Antigravity'; Probe = { Have 'agy' -or (Test-Path "$env:LOCALAPPDATA\Programs\Antigravity") } }
+)
+foreach ($app in $winget) {
+    if (& $app.Probe) { Ok "$($app.Name) installed" }
+    else { Step "installing $($app.Name) (winget $($app.Id))" { winget install --id $app.Id -e --accept-package-agreements --accept-source-agreements --silent --disable-interactivity } }
+}
+$Manual.Add('Antigravity: open it once and sign in with your Google account.')
+
+if (Have 'agentmemory') { Ok "agentmemory $(agentmemory --version)" }
+else { Step 'installing AgentMemory (npm -g @agentmemory/agentmemory@0.9.33)' { npm install -g '@agentmemory/agentmemory@0.9.33' } }
 
 # ---------------------------------------------------------------- 2. tools
 
@@ -222,13 +245,15 @@ if ($MemoryRoot) {
     Ok "memory root pinned to $MemoryRoot (user env var AI_HARNESS_MEMORY)"
 }
 
+$setupArgs = @((Join-Path $Here 'narvai.mjs'), 'setup', '--root', $Root) + $(if ($ClaudeSubscription) { '--claude-subscription' } else { @() })
 if ($DryRun) {
     Info 'DRY-RUN would run: setup-dev-harness.ps1 -Install'
-    Info 'DRY-RUN would run: setup-dev-harness.ps1 -StoreHook On'
+    & node @setupArgs --dry-run
 } else {
     & $setup -Install
-    & $setup -StoreHook On
+    & node @setupArgs
 }
+$Manual.Add('Close Orca and every agent app, then move their home folders under the root: .\scripts\move-app-homes.ps1 -Apply')
 
 # ---------------------------------------------------------------- 6. what is left for you
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // narvai CLI (node 22+, any OS). Commands:
-//   install                                  config, sync, vendored third-party skills, Claude hooks
-//   sync                                     narvai skill to Claude/Codex/Pi/Qwen, Pi rules, Codex/Qwen pointer
+//   setup [--root <dir>] [--claude-subscription] [--dry-run]
+//                                            install --adopt, then wire Hermes, AgentMemory, MCP, Codex and Orca (setup.mjs)
+//   install [--root <dir>] [--adopt]         config, sync, vendored third-party skills, Claude hooks
+//   sync                                     link hub skills into every agent, rules from rules/GLOBAL.md, Qwen pointer
 //   doctor                                   what is installed, stale or missing
 //   usage [--days N]                         which skills are actually used
 //   estimate <path|file>... [--diff[=ref]]   token estimate of what a worker would read (bytes / 3.6)
@@ -10,8 +12,7 @@
 //                                            --hook skips checks marked "hook": false
 //   hooks <repo>                             install a pre-push hook that runs verify; an existing hook is kept and runs first
 import { execFileSync, execSync, spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, matchesGlob, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -263,62 +264,67 @@ function installHooks(args) {
 
 const HARNESS = dirname(fileURLToPath(import.meta.url));
 const tilde = (p) => p.replace(/^~(?=[\\/]|$)/, homedir());
-const sha = (f) => createHash('sha256').update(readFileSync(f)).digest('hex').toUpperCase();
-function* walkFiles(dir) {
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, e.name);
-    if (e.isDirectory()) yield* walkFiles(p); else yield p;
-  }
-}
 function backup(file) {
   if (!existsSync(file)) return;
   const dir = join(homedir(), '.narvai', 'backups');
   mkdirSync(dir, { recursive: true });
   copyFileSync(file, join(dir, `${file.split(/[\\/]/).slice(-2).join('_')}.${Date.now()}`));
 }
-const agentHomes = () => [['claude', join(homedir(), '.claude')], ['codex', join(homedir(), '.codex')], ['pi', join(homedir(), '.pi', 'agent')], ['qwen', join(homedir(), '.qwen')]]
-  .filter(([, d]) => existsSync(d));
+// One physical copy per skill, in this repo: every agent's skill dir holds junctions (symlinks off Windows) to it.
+const skillTargets = () => [join(homedir(), '.claude', 'skills'), join(homedir(), '.agents', 'skills'), join(homedir(), '.gemini', 'config', 'skills'), join(homedir(), '.pi', 'agent', 'skills')]
+  .filter((d) => existsSync(dirname(d)));
+const sameDir = (a, b) => { try { return realpathSync(a) === realpathSync(b); } catch { return false; } };
+
+function link(src, dst) {
+  if (sameDir(src, dst)) return false;
+  if (lstatSync(dst, { throwIfNoEntry: false })) {
+    const bak = join(homedir(), '.narvai', 'backups', 'skills', `${dst.split(/[\\/]/).slice(-3).join('_')}.${Date.now()}`);
+    mkdirSync(dirname(bak), { recursive: true });
+    renameSync(dst, bak);
+  }
+  mkdirSync(dirname(dst), { recursive: true });
+  symlinkSync(src, dst, 'junction');
+  return true;
+}
 
 function syncSkill() {
   const src = join(HARNESS, 'skills', 'narvai-orchestrator');
-  const mPath = join(src, 'sync-manifest.json');
-  const files = [...walkFiles(src)].filter((f) => f !== mPath);
-  const old = existsSync(mPath) ? JSON.parse(readFileSync(mPath, 'utf8')).files ?? {} : {};
-  const now = Object.fromEntries(files.map((f) => [relative(src, f), sha(f)]));
-  for (const [name, home] of agentHomes()) {
-    const dst = join(home, 'skills', 'narvai-orchestrator');
-    if (existsSync(dst)) {
-      const edited = Object.entries(old).filter(([rel, h]) => existsSync(join(dst, rel)) && ![h, now[rel]].includes(sha(join(dst, rel)))).map(([rel]) => rel);
-      if (edited.length) console.log(`  WARN ${name}: local edits in the copy are overwritten: ${edited.join(', ')}`);
-      rmSync(dst, { recursive: true, force: true });
-    }
-    cpSync(src, dst, { recursive: true, filter: (s) => s !== mPath });
-    console.log(`  OK   ${name}: ${files.length} files -> ${dst}`);
-  }
-  writeFileSync(mPath, JSON.stringify({ source: src, syncedAt: new Date().toISOString(), files: now }, null, 2));
+  for (const dir of skillTargets()) console.log(`  ${link(src, join(dir, 'narvai-orchestrator')) ? 'LINK' : 'OK  '} narvai-orchestrator -> ${dir}`);
 }
 
-function syncPiRules() {
-  const src = join(homedir(), '.claude', 'CLAUDE.md');
-  const pi = join(homedir(), '.pi', 'agent');
-  if (!existsSync(src) || !existsSync(pi)) return;
-  const dst = join(pi, 'AGENTS.md');
-  const body = '<!-- GENERATED by narvai.mjs sync from ~/.claude/CLAUDE.md. Do not edit here. -->\n<!-- Edit the source, then rerun: node narvai.mjs sync -->\n\n' + readFileSync(src, 'utf8');
+function writeGenerated(dst, body) {
+  if (!existsSync(dirname(dst))) return;
   if (existsSync(dst)) {
     const cur = readFileSync(dst, 'utf8');
-    if (cur === body) { console.log(`  OK   pi rules current: ${dst}`); return; }
-    if (!/GENERATED by (setup-dev-harness|narvai)/.test(cur)) { console.log(`  WARN ${dst} was not generated by narvai; left alone`); return; }
+    if (cur === body) { console.log(`  OK   rules current: ${dst}`); return; }
+    if (!/GENERATED by (setup-dev-harness|narvai)/.test(cur) && !process.argv.includes('--adopt')) {
+      console.log(`  WARN ${dst} was not generated by narvai; left alone (rerun with --adopt to take it over, a backup is kept)`);
+      return;
+    }
   }
   backup(dst);
   writeFileSync(dst, body);
-  console.log(`  OK   pi rules generated: ${dst}`);
+  console.log(`  OK   rules generated: ${dst}`);
 }
 
-function pointer(file, lib) {
-  if (!existsSync(dirname(file))) return;
-  let t = existsSync(file) ? readFileSync(file, 'utf8') : '';
-  const eol = t.includes('\r\n') ? '\r\n' : '\n';
-  const block = [
+const hermesHome = () => process.env.HERMES_HOME
+  || (process.platform === 'win32' ? join(process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'), 'hermes') : join(homedir(), '.hermes'));
+const nativeRoot = () => (cfg.aiRoot ?? defaultRoot()).replace(/[\\/]/g, process.platform === 'win32' ? '\\' : '/');
+
+// Every agent gets the same rendered copy of rules/GLOBAL.md; {{AI_ROOT}} becomes the configured root.
+function syncRules(lib) {
+  const read = (f) => readFileSync(join(HARNESS, 'rules', f), 'utf8').replace(/\r\n/g, '\n').replaceAll('{{AI_ROOT}}', nativeRoot()).trimEnd();
+  const head = '<!-- GENERATED by narvai.mjs sync from rules/GLOBAL.md. Do not edit here. -->\n<!-- Edit the source, then rerun: node narvai.mjs sync -->\n\n';
+  const tail = '\n\n' + narvaiBlock(lib, '\n') + '\n';
+  const rules = read('GLOBAL.md');
+  for (const dst of [join(homedir(), '.claude', 'CLAUDE.md'), join(homedir(), '.codex', 'AGENTS.md'), join(homedir(), '.gemini', 'config', 'GEMINI.md'), join(homedir(), '.pi', 'agent', 'AGENTS.md')]) {
+    writeGenerated(dst, head + rules + tail);
+  }
+  writeGenerated(join(hermesHome(), 'SOUL.md'), head + read('hermes-identity.md') + '\n\n' + rules + tail);
+}
+
+function narvaiBlock(lib, eol) {
+  return [
     '<!-- narvai:start -->', '## Development', '',
     'Kodla, repoyla ya da teslimatla ilgili her istekte ve kullanici "narvai" dediginde narvai-orchestrator skill\'ini oku',
     '(bu aracin skills klasorunde; yoksa `' + lib + '/narvai-orchestrator/SKILL.md`) ve ona gore ilerle.',
@@ -328,6 +334,13 @@ function pointer(file, lib) {
     '`work/<id>/state.yaml` ve `PROGRESS.md` dosyalarini oku, `next_action`dan devam et. Sohbet gecmisi handoff protokolu degildir.',
     '<!-- narvai:end -->',
   ].join(eol);
+}
+
+function pointer(file, lib) {
+  if (!existsSync(dirname(file))) return;
+  let t = existsSync(file) ? readFileSync(file, 'utf8') : '';
+  const eol = t.includes('\r\n') ? '\r\n' : '\n';
+  const block = narvaiBlock(lib, eol);
   const before = t;
   t = t.replace(/\r?\n## Development\r?\n\r?\nKodla, repoyla[\s\S]*?gecmisi handoff protokolu degildir\.\r?\n?/, eol);
   t = t.replace(/<!-- narvai:start -->[\s\S]*?<!-- narvai:end -->\r?\n?/, '');
@@ -340,16 +353,12 @@ function pointer(file, lib) {
 
 function installThirdParty() {
   const m = JSON.parse(readFileSync(join(HARNESS, 'third-party.json'), 'utf8'));
-  const lib = tilde(m.skillLibrary);
-  mkdirSync(lib, { recursive: true });
   let n = 0;
   for (const s of m.sources) {
     for (const sk of s.skills) {
       const from = join(HARNESS, 'third-party', 'skills', sk);
       if (!existsSync(from)) { console.log(`  WARN vendored copy missing: ${sk}`); continue; }
-      const to = join(lib, sk);
-      rmSync(to, { recursive: true, force: true });
-      cpSync(from, to, { recursive: true });
+      for (const dir of skillTargets()) link(from, join(dir, sk));
       n++;
     }
     for (const a of s.agents ?? []) {
@@ -360,7 +369,7 @@ function installThirdParty() {
     const done = s.done && (s.done.startsWith('which:') ? which(s.done.slice(6)) : existsSync(tilde(s.done.slice(5))));
     for (const step of s.manual ?? []) console.log(done ? `  OK   ${s.repo}: already set up` : `  TODO ${s.repo}: ${step}`);
   }
-  console.log(`  OK   ${n} third-party skills -> ${lib}`);
+  console.log(`  OK   ${n} third-party skills linked into ${skillTargets().join(', ')}`);
   const sp = join(homedir(), '.claude', 'settings.json');
   const enabled = existsSync(sp) ? Object.keys(JSON.parse(readFileSync(sp, 'utf8')).enabledPlugins ?? {}).map((k) => k.split('@')[0]) : [];
   const missingPlugins = m.plugins.names.filter((p) => !enabled.includes(p.split(' ')[0]));
@@ -395,23 +404,34 @@ function registerClaudeHooks() {
   console.log(`  OK   Claude hooks registered (${want.length}) -> ${p}`);
 }
 
+// --root moves the layout (Harness, Features, Memory, Worktrees, Apps) somewhere else; data already under the old root stays put.
 function initConfig() {
-  if (existsSync(cfgPath)) { console.log(`  OK   config: ${cfgPath}`); return; }
-  const store = join(homedir(), 'narvai-store');
+  const i = process.argv.indexOf('--root');
+  const asked = i > 0 ? process.argv[i + 1]?.replace(/\\/g, '/') : undefined;
+  const root = asked ?? cfg.aiRoot ?? defaultRoot();
+  const derived = { aiRoot: root, storeRoot: `${root}/Features/_harness`, docsRoot: `${root}/Features` };
+  const next = existsSync(cfgPath) && !asked
+    ? { ...cfg, aiRoot: root }
+    : { language: 'tr', subagentWarn: 200000, subagentReturn: 300000, workerReadBudget: 60000, evalRepos: {}, ...cfg, ...derived };
+  mkdirSync(next.storeRoot, { recursive: true });
+  if (!existsSync(join(next.storeRoot, 'map.json'))) writeFileSync(join(next.storeRoot, 'map.json'), '{}\n');
+  if (JSON.stringify(next) === JSON.stringify(cfg)) { console.log(`  OK   config: ${cfgPath} (aiRoot ${root})`); return; }
   mkdirSync(dirname(cfgPath), { recursive: true });
-  mkdirSync(store, { recursive: true });
-  if (!existsSync(join(store, 'map.json'))) writeFileSync(join(store, 'map.json'), '{}\n');
-  writeFileSync(cfgPath, JSON.stringify({ storeRoot: store, docsRoot: join(homedir(), 'narvai-docs'), language: 'en', subagentWarn: 200000, subagentReturn: 300000, workerReadBudget: 60000, evalRepos: {} }, null, 2) + '\n');
-  Object.assign(cfg, JSON.parse(readFileSync(cfgPath, 'utf8')));
-  console.log(`  OK   config created: ${cfgPath} (edit storeRoot, docsRoot, language, evalRepos)`);
+  backup(cfgPath);
+  writeFileSync(cfgPath, JSON.stringify(next, null, 2) + '\n');
+  Object.assign(cfg, next);
+  console.log(`  OK   config written: ${cfgPath} (aiRoot ${root})`);
+}
+
+function defaultRoot() {
+  return process.platform === 'win32' ? 'C:/Projects/AI' : join(homedir(), 'AI').replace(/\\/g, '/');
 }
 
 function sync() {
   console.log('narvai sync');
   syncSkill();
-  syncPiRules();
   const lib = tilde(JSON.parse(readFileSync(join(HARNESS, 'third-party.json'), 'utf8')).skillLibrary).replace(/\\/g, '/');
-  pointer(join(homedir(), '.codex', 'AGENTS.md'), lib);
+  syncRules(lib);
   pointer(join(homedir(), '.qwen', 'QWEN.md'), lib);
 }
 
@@ -441,13 +461,9 @@ function doctor() {
     const gone = Object.keys(map).filter((r) => !existsSync(r));
     add(gone.length ? null : true, `map.json: ${Object.keys(map).length} repos`, gone.length ? `${gone.length} paths no longer exist` : '');
   }
-  const mPath = join(HARNESS, 'skills', 'narvai-orchestrator', 'sync-manifest.json');
-  const man = existsSync(mPath) ? JSON.parse(readFileSync(mPath, 'utf8')).files : {};
-  for (const [name, home] of agentHomes()) {
-    const dst = join(home, 'skills', 'narvai-orchestrator');
-    const stale = Object.entries(man).filter(([rel, h]) => !existsSync(join(dst, rel)) || sha(join(dst, rel)) !== h).length;
-    add(existsSync(dst) && !stale ? true : false, `narvai copy for ${name}`, stale ? `${stale} file(s) differ: run sync` : '');
-  }
+  for (const dir of skillTargets()) add(sameDir(join(HARNESS, 'skills', 'narvai-orchestrator'), join(dir, 'narvai-orchestrator')), `narvai link in ${dir}`, 'run sync');
+  const claudeMd = join(homedir(), '.claude', 'CLAUDE.md');
+  add(existsSync(claudeMd) && readFileSync(claudeMd, 'utf8').includes('GENERATED by narvai.mjs sync from rules/GLOBAL.md'), 'Claude CLAUDE.md generated from rules/GLOBAL.md', 'run sync --adopt');
   const tp = JSON.parse(readFileSync(join(HARNESS, 'third-party.json'), 'utf8'));
   const lib = tilde(tp.skillLibrary);
   const missing = tp.sources.flatMap((s) => s.skills).filter((sk) => !existsSync(join(lib, sk, 'SKILL.md')));
@@ -473,4 +489,5 @@ else if (cmd === 'install') install();
 else if (cmd === 'sync') sync();
 else if (cmd === 'doctor') doctor();
 else if (cmd === 'usage') await import(pathToFileURL(join(HARNESS, 'skill-usage.mjs')).href);
-else { console.error('commands: install, sync, doctor, usage [--days N], estimate, eval [--only=id,id] [--dry-run], verify [--all] [--hook], hooks <repo>'); process.exit(2); }
+else if (cmd === 'setup') await import(pathToFileURL(join(HARNESS, 'setup.mjs')).href);
+else { console.error('commands: setup [--root <dir>] [--claude-subscription] [--dry-run], install [--root <dir>] [--adopt], sync [--adopt], doctor, usage [--days N], estimate, eval [--only=id,id] [--dry-run], verify [--all] [--hook], hooks <repo>'); process.exit(2); }

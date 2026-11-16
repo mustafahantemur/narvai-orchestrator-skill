@@ -22,7 +22,7 @@ if (-not $cwd) { Write-Empty }
 
 $cfgPath = Join-Path $HOME '.narvai\config.json'
 $cfgRoot = if (Test-Path $cfgPath) { (Get-Content $cfgPath -Raw | ConvertFrom-Json).storeRoot } else { $null }
-$memoryRoot = if ($env:AI_HARNESS_MEMORY) { $env:AI_HARNESS_MEMORY } elseif ($cfgRoot) { $cfgRoot } else { 'C:\Projects\Features\_harness' }
+$memoryRoot = if ($env:AI_HARNESS_MEMORY) { $env:AI_HARNESS_MEMORY } elseif ($cfgRoot) { $cfgRoot } else { 'C:\Projects\AI\Features\_harness' }
 $mapPath = Join-Path $memoryRoot 'map.json'
 if (-not (Test-Path $mapPath)) { Write-Empty }
 
