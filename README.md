@@ -2,21 +2,24 @@
 
 Türkçe · [English](README.en.md)
 
-Hermes, Claude Code, Codex, Antigravity ve Orca için tek bir geliştirme ortamı. Skill'ler, kurallar ve hafıza tek yerde
-durur, her agent aynı dosyaları okur. Hermes içinde Claude ile başlayıp limit dolunca aynı oturumda Codex ile devam
-edersin. .NET ve React/Next.js işlerinde `narvai-orchestrator` isteğin niyetini okuyup doğru skill'leri seçer, store'u
-repo dışında tutar ve "done" kapısını (`verify` + pre-push) uygular.
+Claude Code, Codex, Antigravity, Orca ve isteğe bağlı olarak Hermes için tek bir geliştirme ortamı. Skill'ler, kurallar
+ve hafıza tek yerde durur, her agent aynı dosyaları okur. Claude Code'da kaydedilen bir karar Codex'te ya da
+Antigravity'de AgentMemory'den geri gelir. .NET ve React/Next.js işlerinde `narvai-orchestrator` isteğin niyetini okuyup
+doğru skill'leri seçer, store'u repo dışında tutar ve "done" kapısını (`verify` + pre-push) uygular.
 
 ## Nasıl çalışır
 
 ```
 Orca (çalışma alanı, worktree'ler)
-  └─ Hermes (tek agent döngüsü, tek oturum)
-       ├─ Claude aboneliği    claude CLI üzerinden (DirectSDK plugin'i)
-       ├─ ChatGPT aboneliği   Codex OAuth, fallback olarak
-       └─ AgentMemory         yerel, ortak hafıza
-Claude Code, Codex, Antigravity, Pi: aynı skill'ler, aynı kurallar, aynı hafıza
+  ├─ Claude Code    Claude aboneliği, kendi CLI'ı
+  ├─ Codex          ChatGPT aboneliği, kendi CLI'ı
+  └─ Hermes         isteğe bağlı; Claude aboneliği varsayılan olarak kapalı
+Antigravity, Pi     aynı skill'ler ve kurallar
+AgentMemory         hepsinin ortak, yerel hafızası (MCP; Hermes'te memory provider)
 ```
+
+Her abonelik kendi resmi istemcisiyle kullanılır. Bir iş Claude Code'dan Codex'e geçtiğinde bağlam AgentMemory'den ve
+store'daki `PROGRESS.md`'den gelir.
 
 - Her skill'in tek fiziksel kopyası bu repodadır. `~/.claude/skills`, `~/.agents/skills` (Codex),
   `~/.gemini/config/skills` (Antigravity) ve Pi'deki girdiler buraya junction'dır. Hermes `skills.external_dirs` ile
@@ -47,7 +50,7 @@ git clone https://github.com/mustafahantemur/narvai-orchestrator-skill.git C:\Pr
 cd C:\Projects\AI\Harness
 .\install-dev-harness.ps1                       # kök C:\Projects\AI
 .\install-dev-harness.ps1 -Root D:\AI           # başka bir kök
-.\install-dev-harness.ps1 -ClaudeSubscription   # Hermes'in ana modeli Claude aboneliği olur
+.\install-dev-harness.ps1 -ClaudeSubscription   # Hermes'te Claude aboneliği (bkz. Bilinen sınırlar)
 .\install-dev-harness.ps1 -DryRun               # yalnız planı gösterir
 ```
 
@@ -84,17 +87,19 @@ node narvai.mjs setup [--root D:\AI] [--claude-subscription] [--dry-run]
   DevOps MCP'sini yazma tool'ları kapalı olarak ekler. `--claude-subscription` Claude DirectSDK plugin'ini kurar ve ana
   model yapar.
 - Codex'te proje talimatı için `CLAUDE.md` fallback'ini açar, Claude içeriğini kopyalayan import sync'ini kapatır.
-- Orca kapalıysa varsayılan agent'ı Hermes yapar, Hermes argümanını `--yolo` yerine `--checkpoints` yapar ve
-  worktree klasörünü `<kök>\Worktrees` olarak ayarlar.
+- Orca kapalıysa Hermes argümanını `--yolo` yerine `--checkpoints` yapar, worktree klasörünü `<kök>\Worktrees` olarak
+  ayarlar ve config'de `orcaDefaultAgent` varsa (`claude`, `codex`, `hermes`) varsayılan agent'ı o yapar.
 
 ### Elle yapılacaklar
 
 ```powershell
 claude                                        # Claude Code'a giriş
 codex login                                   # Codex CLI'a giriş
-hermes auth add openai-codex --type oauth     # Hermes içinde ChatGPT aboneliği
-hermes fallback add                           # Claude limiti dolunca Codex devralır
 .\scripts\move-app-homes.ps1 -Apply           # tüm agent uygulamaları kapalıyken
+
+# yalnız Hermes kullanacaksan
+hermes auth add openai-codex --type oauth     # Hermes içinde ChatGPT aboneliği
+hermes fallback add                           # ana model limiti dolunca Codex devralır
 ```
 
 Antigravity'yi bir kez açıp Google hesabınla giriş yap.
@@ -103,16 +108,16 @@ Antigravity'yi bir kez açıp Google hesabınla giriş yap.
 
 | İş | Nasıl |
 |---|---|
-| Hermes'i Orca'dan aç | Orca'da yeni sekme, agent Hermes |
-| Model değiştir | Hermes içinde `/model` |
-| Oturuma devam et | `hermes -c` ya da `hermes --resume <id>` |
+| Agent'ı Orca'dan aç | Orca'da yeni sekme, agent Claude Code ya da Codex |
+| Oturuma devam et | `claude --resume <id>`, `codex resume`; Hermes'te `hermes -c` |
+| Agent değiştir | işi yeni sekmede öteki agent'la sürdür; bağlam AgentMemory ve `PROGRESS.md`'den gelir |
 | Hafızada ara | agent'a sor ya da `memory_recall`, `memory_smart_search` |
 | Karar kaydet | `DECISION <ID> \| topic: ... \| decision: ... \| status: current \| date: YYYY-MM-DD \| source: ...` |
 | Hafıza sağlığı | `agentmemory status`, görüntüleyici `http://localhost:3113` |
 | Skill ekle | klasörü `third-party/skills` altına koy, `third-party.json`'a yaz, `node narvai.mjs install` |
 | Kural değiştir | `rules/GLOBAL.md`'yi düzenle, `node narvai.mjs sync` |
 | Claude plugin güncellemesinden sonra | `node narvai.mjs setup` |
-| Durum | `node narvai.mjs doctor`, `hermes status`, `hermes fallback list` |
+| Durum | `node narvai.mjs doctor`, `agentmemory status`; Hermes için `hermes status` |
 
 Aynı tip ve ID ile kaydedilen karar eskisini supersede eder. Recall yalnız güncel kaydı döndürür.
 
@@ -146,8 +151,10 @@ Aynı tip ve ID ile kaydedilen karar eskisini supersede eder. Recall yalnız gü
 
 - Hermes'in AgentMemory plugin'i katalogda yalnız Linux ve macOS için listelenir. Windows'ta built-in `MEMORY.md`
   yazımlarının aynalanması POSIX dosya kilidi istediği için çalışmaz. Kayıt, recall, arama ve konuşma yakalama çalışır.
-- Hermes'te Claude aboneliği DirectSDK plugin'iyle kullanılır. Plugin değiştirilmemiş `claude` CLI'ını senin login'inle
-  çalıştırır. Anthropic'in koşullarını ve Team ya da Enterprise planda şirket politikasını kendin değerlendir.
+- Hermes'te Claude aboneliği varsayılan olarak kapalıdır. DirectSDK plugin'i değiştirilmemiş `claude` CLI'ını senin
+  login'inle çalıştırır, ama Anthropic aboneliğin üçüncü parti araçlardan kullanımını sınırlıyor ve bu kullanım ek ücretli
+  kullanıma (extra usage) düşebilir. Açmadan önce Anthropic'in koşullarını ve Team ya da Enterprise planda şirket
+  politikasını kontrol et. `node narvai.mjs setup --claude-subscription` plugin'i açar ve ana model yapar.
 - Orca açıkken ayar dosyasına yazılmaz. `setup` bunu `TODO` olarak bildirir.
 - caveman yalnız sohbet yanıtlarını kısaltır. Kod, commit, doküman ve hafıza kayıtları normal yazılır.
 

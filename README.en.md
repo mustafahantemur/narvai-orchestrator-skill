@@ -2,21 +2,24 @@
 
 [Türkçe](README.md) · English
 
-One development setup for Hermes, Claude Code, Codex, Antigravity and Orca. Skills, rules and memory live in one place
-and every agent reads the same files. In Hermes you start a task on Claude and, when its limit is reached, continue the
-same session on Codex. For .NET and React/Next.js work, `narvai-orchestrator` reads the intent of a request, picks the
-skills, keeps the project store outside the repository and enforces the "done" gate (`verify` plus a pre-push hook).
+One development setup for Claude Code, Codex, Antigravity, Orca and, optionally, Hermes. Skills, rules and memory live
+in one place and every agent reads the same files. A decision saved in Claude Code comes back from AgentMemory in Codex
+or Antigravity. For .NET and React/Next.js work, `narvai-orchestrator` reads the intent of a request, picks the skills,
+keeps the project store outside the repository and enforces the "done" gate (`verify` plus a pre-push hook).
 
 ## How it works
 
 ```
 Orca (workspace, worktrees)
-  └─ Hermes (one agent loop, one session)
-       ├─ Claude subscription    through the claude CLI (DirectSDK plugin)
-       ├─ ChatGPT subscription   Codex OAuth, as the fallback
-       └─ AgentMemory            local, shared memory
-Claude Code, Codex, Antigravity, Pi: the same skills, rules and memory
+  ├─ Claude Code    Claude subscription, its own CLI
+  ├─ Codex          ChatGPT subscription, its own CLI
+  └─ Hermes         optional; the Claude subscription is off by default
+Antigravity, Pi     the same skills and rules
+AgentMemory         shared local memory for all of them (MCP; the memory provider in Hermes)
 ```
+
+Each subscription is used through its own official client. When a task moves from Claude Code to Codex, the context
+comes from AgentMemory and from `PROGRESS.md` in the store.
 
 - Every skill has one physical copy, in this repository. The entries in `~/.claude/skills`, `~/.agents/skills` (Codex),
   `~/.gemini/config/skills` (Antigravity) and Pi are junctions to it. Hermes reads it directly through
@@ -48,7 +51,7 @@ git clone https://github.com/mustafahantemur/narvai-orchestrator-skill.git C:\Pr
 cd C:\Projects\AI\Harness
 .\install-dev-harness.ps1                       # root C:\Projects\AI
 .\install-dev-harness.ps1 -Root D:\AI           # another root
-.\install-dev-harness.ps1 -ClaudeSubscription   # make the Claude subscription Hermes' main model
+.\install-dev-harness.ps1 -ClaudeSubscription   # Claude subscription in Hermes (see Known limits)
 .\install-dev-harness.ps1 -DryRun               # print the plan only
 ```
 
@@ -87,17 +90,20 @@ do by hand. Running it again is safe, and it backs up every file it changes unde
   it the main model.
 - In Codex it turns on the `CLAUDE.md` fallback for project instructions and turns off the import sync that copies
   Claude content.
-- When Orca is closed it makes Hermes the default agent, replaces Hermes' `--yolo` argument with `--checkpoints` and sets
-  the worktree folder to `<root>\Worktrees`.
+- When Orca is closed it replaces Hermes' `--yolo` argument with `--checkpoints`, sets the worktree folder to
+  `<root>\Worktrees` and, when the config has `orcaDefaultAgent` (`claude`, `codex`, `hermes`), makes that the default
+  agent.
 
 ### By hand
 
 ```powershell
 claude                                        # sign in to Claude Code
 codex login                                   # sign in to the Codex CLI
-hermes auth add openai-codex --type oauth     # ChatGPT subscription inside Hermes
-hermes fallback add                           # Codex takes over when the Claude limit is reached
 .\scripts\move-app-homes.ps1 -Apply           # with every agent app closed
+
+# only if you use Hermes
+hermes auth add openai-codex --type oauth     # ChatGPT subscription inside Hermes
+hermes fallback add                           # Codex takes over when the main model's limit is reached
 ```
 
 Open Antigravity once and sign in with your Google account.
@@ -106,16 +112,16 @@ Open Antigravity once and sign in with your Google account.
 
 | Task | How |
 |---|---|
-| Open Hermes from Orca | new tab in Orca, agent Hermes |
-| Switch model | `/model` inside Hermes |
-| Resume a session | `hermes -c` or `hermes --resume <id>` |
+| Open an agent from Orca | new tab in Orca, agent Claude Code or Codex |
+| Resume a session | `claude --resume <id>`, `codex resume`; in Hermes `hermes -c` |
+| Switch agent | continue the task in a new tab with the other agent; the context comes from AgentMemory and `PROGRESS.md` |
 | Search memory | ask the agent, or `memory_recall`, `memory_smart_search` |
 | Save a decision | `DECISION <ID> \| topic: ... \| decision: ... \| status: current \| date: YYYY-MM-DD \| source: ...` |
 | Memory health | `agentmemory status`, viewer at `http://localhost:3113` |
 | Add a skill | put its folder under `third-party/skills`, list it in `third-party.json`, `node narvai.mjs install` |
 | Change a rule | edit `rules/GLOBAL.md`, then `node narvai.mjs sync` |
 | After a Claude plugin update | `node narvai.mjs setup` |
-| Status | `node narvai.mjs doctor`, `hermes status`, `hermes fallback list` |
+| Status | `node narvai.mjs doctor`, `agentmemory status`; for Hermes `hermes status` |
 
 A decision saved again with the same type and ID supersedes the old one. Recall returns only the current record.
 
@@ -149,8 +155,10 @@ A decision saved again with the same type and ID supersedes the old one. Recall 
 
 - The Hermes catalog lists the AgentMemory plugin for Linux and macOS only. On Windows, mirroring the built-in
   `MEMORY.md` writes needs POSIX file locking and does not run. Saving, recall, search and conversation capture work.
-- Hermes uses the Claude subscription through the DirectSDK plugin, which runs the unmodified `claude` CLI with your own
-  login. Check Anthropic's terms, and on a Team or Enterprise plan your company policy, yourself.
+- The Claude subscription in Hermes is off by default. The DirectSDK plugin runs the unmodified `claude` CLI with your
+  own login, but Anthropic restricts using the subscription from third-party tools and that use can be billed as extra
+  usage. Check Anthropic's terms, and on a Team or Enterprise plan your company policy, before you turn it on.
+  `node narvai.mjs setup --claude-subscription` enables the plugin and makes it the main model.
 - Setup never writes Orca's settings while Orca is running. It reports a `TODO` instead.
 - caveman shortens chat replies only. Code, commits, documents and memory records are written in normal prose.
 

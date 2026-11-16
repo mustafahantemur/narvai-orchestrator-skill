@@ -205,7 +205,7 @@ else {
     hset('model.default', cfg.hermesModel ?? 'claude-opus-5-5[1m]');
     hset('model.base_url', '');
   });
-  todo.push('Codex in Hermes: hermes auth add openai-codex --type oauth, then: hermes fallback add');
+  todo.push('optional, Codex in Hermes: hermes auth add openai-codex --type oauth, then: hermes fallback add');
 }
 
 console.log('Codex');
@@ -226,13 +226,13 @@ const orcaRoot = WIN ? join(process.env.APPDATA ?? '', 'orca') : join(HOME, '.co
 const orcaIndex = join(orcaRoot, 'orca-profile-index.json');
 if (!existsSync(orcaIndex)) console.log('  SKIP Orca has not run yet');
 else if (spawnSync(WIN ? 'tasklist' : 'pgrep', WIN ? ['/fi', 'imagename eq Orca.exe'] : ['-x', 'Orca'], { encoding: 'utf8' }).stdout.match(/orca/i)) {
-  console.log('  TODO Orca is running; close it and rerun setup (or set in Orca Settings: default agent Hermes, Hermes args --checkpoints, workspace dir)');
-} else step(`default agent Hermes, --checkpoints, worktrees in ${root}/Worktrees`, () => {
+  console.log('  TODO Orca is running; close it and rerun setup (or set in Orca Settings: default agent, Hermes args --checkpoints, workspace dir)');
+} else step(`${cfg.orcaDefaultAgent ? `default agent ${cfg.orcaDefaultAgent}, ` : ''}Hermes --checkpoints, worktrees in ${root}/Worktrees`, () => {
   const active = JSON.parse(readFileSync(orcaIndex, 'utf8')).activeProfileId;
   mkdirSync(native(`${root}/Worktrees`), { recursive: true });
   return editJson(join(orcaRoot, 'profiles', active, 'orca-data.json'), (d) => {
     d.settings ??= {};
-    if (which('hermes')) d.settings.defaultTuiAgent = 'hermes';
+    if (cfg.orcaDefaultAgent) d.settings.defaultTuiAgent = cfg.orcaDefaultAgent;
     d.settings.agentDefaultArgs = { ...d.settings.agentDefaultArgs, hermes: '--checkpoints' };
     d.settings.workspaceDir = `${root}/Worktrees`;
   });
