@@ -1,6 +1,6 @@
 # Repository intelligence — Graphify + LSP
 
-Graphify is the first structural map for a large or unfamiliar repository. It is a navigation aid, never truth.
+Graphify is a structural map of a repository, built without a model. It is a navigation aid, never truth, and it is not the first step: on 2026-11-16 eight questions on a 6,000-file .NET repo were answered as accurately with Grep and LSP alone, in less time and for the same tokens (`<storeRoot>/graph/olcum/sonuc-2026-11-16.md`). Reach for it when the question is reach or impact across modules or repos.
 
 ## Indexing policy — code only by default
 
@@ -10,25 +10,33 @@ Run Graphify's local deterministic code-structure pass: classes/types, functions
 
 Output and cache are derived runtime intelligence, not canonical memory, and they **never stay in the repository**.
 
-`graphify update <path>` has no output flag — it always writes `<path>/graphify-out/`. So never run it directly against a repo. Use the wrapper, which builds and then moves the index into the external store, restores a previous index for an incremental run, and checks `git status` afterwards:
+`graphify update <path>` has no output flag — it always writes `<path>/graphify-out/`. So it never runs against a repo. It runs against the store clone of the repo, in the shared graph folder that every agent reads:
+
+- root: `<storeRoot>/graph/` (`storeRoot` in `~/.narvai/config.json`)
+- one repo: `<root>/<repo folder>/graphify-out/graph.json`
+- all repos merged: `<root>/ekosistem/graph.json` (cross-repo questions; large and slow to load)
+- `<root>/index.json` lists every graph with its commit and build time. `<root>/repos.json` lists the repos, their ignore patterns and roots; that list is project data and lives in the store, not in the harness.
+
+Build or refresh with no model call:
 
 ```
-setup-dev-harness.ps1 -Graph <repo path>
+node <harness>/scripts/graph/ekosistem.mjs                 # every repo in repos.json: clone or fetch, Graphify, Understand-Anything, merged graph
+node <harness>/scripts/graph/ekosistem.mjs --only <repo>   # one repo
 ```
 
-The index lands at `<store>/graphify/graph.json`. Every read points at it explicitly:
+Every read points at a graph explicitly:
 
 ```
-graphify query "<question>" --budget 500 --graph <store>/graphify/graph.json
-graphify affected "<symbol>" --depth 2   --graph <store>/graphify/graph.json
-graphify god-nodes --top 5               --graph <store>/graphify/graph.json
-graphify path "A" "B"                    --graph <store>/graphify/graph.json
-graphify explain "X"                     --graph <store>/graphify/graph.json
+graphify explain "X"                     --graph <root>/<repo>/graphify-out/graph.json
+graphify affected "<symbol>" --depth 2   --graph <root>/<repo>/graphify-out/graph.json
+graphify query "<question>" --budget 500 --graph <root>/<repo>/graphify-out/graph.json
+graphify path "A" "B"                    --graph <root>/<repo>/graphify-out/graph.json
+graphify god-nodes --top 5               --graph <root>/<repo>/graphify-out/graph.json
 ```
 
-`--budget` is the context guard: the query prints how many nodes it cut rather than dumping the graph.
+`--budget` is the context guard: the query prints how many nodes it cut rather than dumping the graph. `explain` and `affected` return connections with file and line and are the most precise.
 
-Measured on this machine: a 55-file .NET module produced 250 nodes / 406 edges in 5s with no LLM call. The LLM-touching steps are `label` and the clustering pass — the wrapper passes `--no-cluster`, so extraction stays deterministic.
+Measured on this machine (2026-11-16): OmniMind Core, 6,205 files → 48,965 nodes / 114,624 edges in about 6 minutes with no LLM call; twelve repos in about 15 minutes; one query takes 2 to 8 seconds on the Core graph. The driver passes `--no-cluster`, so extraction stays deterministic; `label` and community naming are the LLM-touching steps. The older `setup-dev-harness.ps1 -Graph` wrapper writes to the per-repo store and is superseded by the driver.
 
 ## Use by size
 

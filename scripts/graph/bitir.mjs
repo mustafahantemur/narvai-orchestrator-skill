@@ -3,26 +3,15 @@
 //   node bitir.mjs kaydet <projectRoot>      katman ve turu graph'a ekler, doğrular, kaydeder, dizini günceller
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { FILE_LEVEL, SKILL_DIR, kaydet, readJson, uaPaths, writeJson } from './ua-ortak.mjs';
 
 const [cmd, root] = process.argv.slice(2);
 if (!['birlestir', 'kaydet'].includes(cmd) || !root) {
   console.error('Kullanım: node bitir.mjs birlestir|kaydet <projectRoot>');
   process.exit(1);
 }
-const PROJECT_ROOT = path.resolve(root).replace(/\\/g, '/');
-const PLUGIN_ROOT = path.join(os.homedir(), '.understand-anything-plugin').replace(/\\/g, '/');
-const SKILL_DIR = `${PLUGIN_ROOT}/skills/understand`;
-const cfgPath = path.join(os.homedir(), '.narvai', 'config.json');
-const storeRoot = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')).storeRoot : 'C:/Projects/AI/Features/_harness';
-const STORE = `${storeRoot.replace(/\\/g, '/')}/understand`;
-const UA = `${PROJECT_ROOT}/.ua`;
-const INTER = `${UA}/intermediate`;
-const TMP = `${UA}/tmp`;
-const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
-const writeJson = (p, v) => fs.writeFileSync(p, JSON.stringify(v, null, 2));
-const FILE_LEVEL = new Set(['file', 'config', 'document', 'service', 'pipeline', 'table', 'schema', 'resource', 'endpoint']);
+const { root: PROJECT_ROOT, inter: INTER, tmp: TMP } = uaPaths(root);
 const DIRECTIVE =
   '> **Language directive**: Generate all textual content (summaries, descriptions, tags, titles, languageNotes, languageLesson) in **English**. Domain terms that appear in Turkish in the code stay as written.';
 
@@ -202,53 +191,17 @@ if (cmd === 'kaydet') {
     }))
     .sort((a, b) => a.order - b.order);
 
-  const commit = execFileSync('git', ['-C', PROJECT_ROOT, 'rev-parse', 'HEAD']).toString().trim();
-  const now = new Date().toISOString();
   const edges = graph.edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
   for (const n of graph.nodes) {
     if (!n.summary) n.summary = 'No summary available';
     if (!n.tags || !n.tags.length) n.tags = ['untagged'];
   }
-  const full = {
-    version: '1.0.0',
-    project: { name: scan.name, languages: scan.languages, frameworks: scan.frameworks, description: scan.description, analyzedAt: now, gitCommitHash: commit },
-    nodes: graph.nodes,
-    edges,
-    layers,
-    tour,
-  };
-  writeJson(`${UA}/knowledge-graph.json`, full);
-
-  writeJson(`${INTER}/fingerprint-input.json`, { projectRoot: PROJECT_ROOT, filePaths: scan.files.map((f) => f.path), gitCommitHash: commit });
-  const fp = execFileSync(process.execPath, [`${SKILL_DIR}/build-fingerprints.mjs`, `${INTER}/fingerprint-input.json`]).toString();
-  if (!fp.includes('Fingerprints baseline:')) {
-    console.error(`Parmak izi üretilemedi, meta yazılmadı:\n${fp}`);
+  let entry;
+  try {
+    entry = kaydet(PROJECT_ROOT, scan, { nodes: graph.nodes, edges, layers, tour });
+  } catch (e) {
+    console.error(e.message);
     process.exit(1);
   }
-  writeJson(`${UA}/meta.json`, { lastAnalyzedAt: now, gitCommitHash: commit, version: '1.0.0', analyzedFiles: scan.totalFiles });
-
-  const trash = `${UA}/.trash-${Math.floor(Date.now() / 1000)}`;
-  fs.mkdirSync(trash, { recursive: true });
-  for (const f of fs.readdirSync(INTER)) if (f !== 'scan-result.json') fs.renameSync(`${INTER}/${f}`, `${trash}/${f}`);
-  if (fs.existsSync(TMP)) fs.renameSync(TMP, `${trash}/tmp`);
-
-  const indexPath = `${STORE}/index.json`;
-  const index = fs.existsSync(indexPath) ? readJson(indexPath) : { graphs: [] };
-  const rel = path.posix.relative(STORE, `${UA}/knowledge-graph.json`);
-  const withEdge = new Set(edges.flatMap((e) => [e.source, e.target]));
-  const entry = {
-    name: scan.name,
-    graph: rel,
-    commit,
-    analyzedAt: now,
-    files: scan.totalFiles,
-    nodes: graph.nodes.length,
-    edges: edges.length,
-    layers: layers.map((l) => `${l.name} (${l.nodeIds.length})`),
-    tourSteps: tour.length,
-    orphanNodes: graph.nodes.filter((n) => !withEdge.has(n.id)).length,
-  };
-  index.graphs = [...index.graphs.filter((g) => g.graph !== rel), entry].sort((a, b) => a.graph.localeCompare(b.graph));
-  writeJson(indexPath, index);
   console.log(JSON.stringify({ ...entry, unplacedInLayer: unplaced.length, droppedEdges: graph.edges.length - edges.length }));
 }

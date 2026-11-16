@@ -1,6 +1,6 @@
 // PostToolUse (Bash): after a commit, merge, pull, rebase or cherry-pick, moves the store copy of
 // Understand-Anything to the new HEAD and tells the agent to refresh the graphs that opted in.
-// The graphs live in one shared folder (<storeRoot>/understand/<repo folder>), never in the repo; the
+// The graphs live in one shared folder (<storeRoot>/graph/<repo folder>), never in the repo; the
 // plugin's own hook looks for .ua/ in the repo and would never fire.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -57,7 +57,7 @@ async function main() {
 
   // A worktree's top level is the worktree folder; the common git dir names the main repo.
   const mainRepo = dirname(git(top, 'rev-parse', '--path-format=absolute', '--git-common-dir'));
-  const src = join(dirname(MAP_PATH), 'understand', basename(mainRepo));
+  const src = join(dirname(MAP_PATH), 'graph', basename(mainRepo));
   const graphs = optedInGraphs(src);
   if (graphs.length === 0) return;
 
