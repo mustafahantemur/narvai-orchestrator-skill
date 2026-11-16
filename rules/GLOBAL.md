@@ -147,13 +147,13 @@ Referans dosyaları — orchestrator seçtiğinde okunur, baştan yüklenmez:
 
 **Ortak hafıza: AgentMemory** (`http://localhost:3111`, veri `{{AI_ROOT}}\Memory\agentmemory`). Git ve kaynak
 kod her zaman otoritedir; hafıza onlarla çelişirse hafıza eskidir, kodu esas al.
-- İşe başlarken ilgili kayıtları ara (`memory_recall` / `memory_smart_search`). `project` = git repo kök klasörünün adı
-  (worktree'de ana checkout'un adı, örn. `omnimind_core`). Hermes'in native tool'ları bunu kendisi ekler; MCP tool'larında
-  `project` geçmek zorunlu.
+- İşe başlarken ilgili kayıtları ara (`memory_recall` / `memory_smart_search`). Bütün repo'lar tek ortak hafızayı
+  kullanır: `project` her zaman `{{MEMORY_PROJECT}}`. Hermes'in native tool'ları bunu kendisi ekler; MCP tool'larında
+  `project: {{MEMORY_PROJECT}}` geçmek zorunlu. Kaydın hangi repo'dan geldiğini `source` alanına yaz.
 - Yalnız damıtılmış bilgi kaydet: karar ve gerekçesi, önemli proje gerçeği, konvansiyon, bilinen sorun ve çözümü, aktif iş
   ve ilerleme, tekrar kullanılacak troubleshooting. Kaynak dosya, ham transcript, secret, token yazılmaz.
 - Biçim (aynı tip ve ID ile yeniden kaydetmek eskisini otomatik supersede eder; satırı kısa tut):
-  `DECISION <ID> | topic: <konu> | decision: <karar> | status: current | date: YYYY-MM-DD | source: <commit/PR/dosya>`
+  `DECISION <ID> | topic: <konu> | decision: <karar> | status: current | date: YYYY-MM-DD | source: <repo> <commit/PR/dosya>`
   Diğer tipler aynı biçimde: `FACT`, `CONVENTION`, `ISSUE`, `TASK`, `TROUBLESHOOT`.
 - Kaydın yanıtında `supersedes` yerine `similarTo` dönerse eski kayıt hâlâ güncel görünür: eskisini `status: superseded`
   ile yeniden kaydet.

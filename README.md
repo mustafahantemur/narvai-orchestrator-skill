@@ -24,7 +24,7 @@ Claude Code, Codex, Antigravity, Pi: aynı skill'ler, aynı kurallar, aynı haf�
 - Kuralların kaynağı `rules/GLOBAL.md` dosyasıdır. `sync` her agent'ın kural dosyasını buradan üretir ve `{{AI_ROOT}}`
   yerine kurulum kökünü yazar.
 - Hafıza AgentMemory'dedir (`http://localhost:3111`, API anahtarı gerektirmez, embedding cihazda hesaplanır). Hermes onu
-  native memory provider olarak, diğer agent'lar MCP ile kullanır. Kayıtlar git repo klasörünün adına göre ayrılır.
+  native memory provider olarak, diğer agent'lar MCP ile kullanır. Bütün repo'lar tek ortak hafıza alanını paylaşır (`~/.narvai/config.json` içinde `memoryProject`, varsayılan `shared`).
 
 ## Klasör düzeni
 

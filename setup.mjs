@@ -186,7 +186,7 @@ else {
       run('hermes', ['plugins', 'enable', 'agentmemory'], { allowFail: true });
       hset('memory.provider', 'agentmemory');
       const secretFile = join(HOME, '.agentmemory', 'secret');
-      const pairs = { AGENTMEMORY_AGENT_ID: MEMORY_AGENT_ID };
+      const pairs = { AGENTMEMORY_AGENT_ID: MEMORY_AGENT_ID, AGENTMEMORY_PROJECT_NAME: cfg.memoryProject ?? 'shared' };
       if (existsSync(secretFile)) pairs.AGENTMEMORY_SECRET = readFileSync(secretFile, 'utf8').trim();
       else todo.push('start AgentMemory once, then rerun setup so Hermes gets its local secret');
       return upsertEnv(join(hermesHome, '.env'), pairs);

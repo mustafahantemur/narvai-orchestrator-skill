@@ -24,8 +24,8 @@ Claude Code, Codex, Antigravity, Pi: the same skills, rules and memory
 - `rules/GLOBAL.md` is the source of the rules. `sync` renders every agent's rules file from it and replaces
   `{{AI_ROOT}}` with the install root.
 - Memory lives in AgentMemory (`http://localhost:3111`, no API key, embeddings computed on the machine). Hermes uses it as
-  its native memory provider and the other agents use it over MCP. Records are scoped by the name of the git repository
-  folder.
+  its native memory provider and the other agents use it over MCP. Every repository shares one memory scope
+  (`memoryProject` in `~/.narvai/config.json`, default `shared`).
 
 ## Folder layout
 
