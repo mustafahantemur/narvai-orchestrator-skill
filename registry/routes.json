@@ -16,7 +16,8 @@
     "spec-driven-development",
     "planning-and-task-breakdown",
     "incremental-implementation",
-    "debugging-and-error-recovery"
+    "debugging-and-error-recovery",
+    "karpathy-guidelines"
   ],
   "routes": [
     {

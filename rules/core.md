@@ -12,7 +12,7 @@ These rules apply to every task. Project rule files and the project's own conven
 ## Understand before you change
 
 - Find things in the source: search for the name, then use the language server for definitions, references and implementations. Read the files; cite `file:line`.
-- Before coding against a library or framework, read its current documentation.
+- Before coding against a library or framework, read its current documentation with the docs tool that is connected (Context7 or the like), not from memory.
 - Trace the real flow end to end before choosing a fix. Fix the root cause where every caller passes through, not the path the report names.
 - Do not state what you did not measure. "It is used", "nothing calls it", "fixed": say so only after checking, and say "not verified" otherwise.
 
