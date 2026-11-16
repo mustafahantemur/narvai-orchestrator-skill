@@ -128,6 +128,22 @@
       "why": "React component or data fetching change"
     },
     {
+      "id": "i18n",
+      "phase": "build",
+      "when": {
+        "event": "edit",
+        "paths": [
+          "**/messages/*.json",
+          "**/messages/**/*.json",
+          "**/locales/**/*.json"
+        ]
+      },
+      "skills": [
+        "i18n-sync"
+      ],
+      "why": "locale file change: translate from where the string is used, keep every locale in step"
+    },
+    {
       "id": "ef",
       "phase": "build",
       "when": {
@@ -155,7 +171,8 @@
         ]
       },
       "skills": [
-        "supabase-postgres-best-practices"
+        "supabase-postgres-best-practices",
+        "database-migrations"
       ],
       "why": "PostgreSQL schema, index or query"
     },
@@ -226,6 +243,23 @@
       "why": "writing or changing .NET tests"
     },
     {
+      "id": "tests-react",
+      "phase": "verify",
+      "when": {
+        "event": "tests",
+        "paths": [
+          "**/*.tsx",
+          "**/*.jsx",
+          "**/*.test.ts",
+          "**/*.spec.ts"
+        ]
+      },
+      "skills": [
+        "react-testing"
+      ],
+      "why": "React component and hook tests"
+    },
+    {
       "id": "tests",
       "phase": "verify",
       "when": {
@@ -281,9 +315,41 @@
         "event": "review"
       },
       "skills": [
-        "code-review-and-quality"
+        "code-review-and-quality",
+        "silent-failure-hunter",
+        "pr-test-analyzer"
       ],
       "why": "the user accepted a review"
+    },
+    {
+      "id": "review-dotnet",
+      "phase": "review",
+      "when": {
+        "event": "review",
+        "paths": [
+          "**/*.cs"
+        ]
+      },
+      "skills": [
+        "csharp-reviewer",
+        "type-design-analyzer"
+      ],
+      "why": "C# review lens: async, nullability, EF queries, type design"
+    },
+    {
+      "id": "review-react",
+      "phase": "review",
+      "when": {
+        "event": "review",
+        "paths": [
+          "**/*.tsx",
+          "**/*.jsx"
+        ]
+      },
+      "skills": [
+        "react-reviewer"
+      ],
+      "why": "React review lens: hook correctness, server and client boundary, rendering"
     },
     {
       "id": "review-ui",

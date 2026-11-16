@@ -61,3 +61,19 @@ test('detectStacks() evaluates every profile detect glob', () => {
   assert.deepEqual(detectStacks(repo, profiles), ['dotnet', 'nextjs']);
   assert.deepEqual(detectStacks(repo, join(t, 'none')), []);
 });
+
+test('sync writes a narvai command that runs', async () => {
+  const { mkdtempSync, rmSync, existsSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { execFileSync } = await import('node:child_process');
+  const t = mkdtempSync(join(tmpdir(), 'narvai-shim-'));
+  try {
+    const env = { ...process.env, NARVAI_HOME: t };
+    execFileSync(process.execPath, ['-e', "import('./cli/sync.mjs').then((m) => m.shim())", '--input-type=module'], { cwd: join(import.meta.dirname, '..'), env });
+    const cmd = join(t, '.narvai', 'bin', process.platform === 'win32' ? 'narvai.cmd' : 'narvai');
+    assert.ok(existsSync(cmd));
+    const out = execFileSync(cmd, [], { encoding: 'utf8', shell: process.platform === 'win32' });
+    assert.match(out, /narvai context/);
+  } finally { rmSync(t, { recursive: true, force: true }); }
+});

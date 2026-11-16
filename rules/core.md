@@ -8,6 +8,8 @@ These rules apply to every task. Project rule files and the project's own conven
 - The work follows a lifecycle: define, plan, build, verify, review, ship. A small change is build and verify only. Work that touches three or more files, or changes an endpoint, DTO, enum or error code, gets a short written plan first.
 - At each of these moments run `narvai next --event <name> [--paths <files>]` and load only the skills it names, by reading the file it prints: `unclear` (the request is ambiguous), `idea`, `plan`, `build`, `library` (an external API), `edit` (before editing a kind of file you have not edited yet in this task), `failure`, `tests`, `refactor`, `migrate`, `perf`, `done`, `review`, `decision`, `prose` (any text a person will read), `ship`.
 - Never guess a skill name. `narvai skill --list` shows what exists; `narvai skill <name>` gives the file.
+- `narvai` is a command on PATH. If a shell does not find it, use `{{NARVAI}}`.
+- Say in one line which skills you loaded for the task.
 
 ## Understand before you change
 
@@ -34,7 +36,7 @@ Stop at the first step that holds:
 
 - Before you say a change is done: `narvai next --event done`, then `narvai verify`. Report the result with its numbers. If a check fails, say so with the first error lines.
 - A change to behaviour that an existing test asserts updates that test in the same change.
-- On a red test, first decide which is right, the test or the code: `narvai tests --failed <file>` shows which changed last. Never bend working code to satisfy a stale test, and never weaken a test to make it pass.
+- On a red test, first decide which is right, the test or the code: `narvai tests --failed <file>` shows which changed last. Never bend working code to satisfy a stale test, and never weaken a test, a lint rule or a compiler option to make a check pass.
 - A hook may refuse a command and say what to do instead. Do that. Exceptions are the user's to grant.
 
 ## Keep the context small

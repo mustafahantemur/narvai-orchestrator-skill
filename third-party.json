@@ -306,6 +306,30 @@
       "localChanges": [
         "skills/ only: no hooks, MCP server, commands or session-start script"
       ]
+    },
+    {
+      "set": "ecc",
+      "repo": "affaan-m/ECC",
+      "commit": "d2ef268",
+      "version": "2.2.3",
+      "license": "MIT (LICENSE copied into each skill folder)",
+      "skills": [
+        "silent-failure-hunter",
+        "pr-test-analyzer",
+        "csharp-reviewer",
+        "type-design-analyzer",
+        "react-reviewer",
+        "i18n-sync",
+        "react-testing",
+        "database-migrations"
+      ],
+      "localChanges": [
+        "eight items only, out of 314 skills and 71 agents: no hooks, commands, rules or router",
+        "the five reviewers are ECC agents (agents/*.md) wrapped as skills: the agent frontmatter (model, tools) and the \"Prompt Defense Baseline\" block are removed",
+        "csharp-reviewer and react-reviewer: \"Diagnostic Commands\" removed (the checks are narvai verify's job); react-reviewer: \"Scope vs typescript-reviewer\" and \"Related\" removed",
+        "i18n-sync: \"Optional Locakit Reports\", \"Hook Integration\" and \"Related\" removed",
+        "database-migrations: the Prisma, Drizzle, Kysely, Django and golang-migrate sections removed"
+      ]
     }
   ],
   "plugins": {
