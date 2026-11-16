@@ -6,13 +6,13 @@ These rules apply to every task. When two instructions disagree, the order is: t
 
 - At session start a hook may print a `narvai session start` digest. It is not the rules. Before you change code in a repository, run `narvai context` once and work from what it prints: the project's rules, the stack rules, the checks, the open work item, where state is kept.
 - A small change is made and verified. Work that touches three or more files, or changes an endpoint, DTO, enum or error code, gets a short written plan first; then wait for the user's go-ahead unless their rules say otherwise.
-- `narvai next --event <name> [--paths <files>]` names the skills for a moment. Read the files it prints, as much of each as the task needs, and nothing else. The moments:
+- At each of the moments below, run `narvai next --event <name> [--paths <files>]` and read the skill files it prints before you go on, as much of each as the moment needs. Reading the skill a moment calls for is part of the work, not overhead to save. The moments:
   - `unclear`: the request can be read two ways. Ask one question; do not guess.
   - `plan`: before writing a plan or a spec.
   - `build`: before the first edit of a change that spans several files.
   - `edit --paths <file>`: before the first edit of a kind of file in this task. If you skip it, a hook names the same skills at that edit: read them then.
   - `library`: before using an external API you have not used in this task.
-  - `failure`: a build, a test or a run fails and you do not yet know why.
+  - `failure`: a build, a test or the program fails, or the user reports a bug, and you do not yet know why. A search that finds nothing is not a failure.
   - `tests --paths <file>`: before writing or changing tests. `refactor --paths <file>`: before restructuring without changing behaviour.
   - `done`: before you say a change is finished.
   - `review --paths <files>`: the user asked for a review. `prose`: before writing text a person will read. `ship`: the user asked for a commit, a push or a PR.

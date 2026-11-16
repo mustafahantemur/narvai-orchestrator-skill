@@ -33,7 +33,7 @@ export function digest(events) {
   const calls = new Map();
   for (const ev of events) {
     if (ev.type === 'system' && ev.subtype === 'init') { run.model = ev.model; run.apiKeySource = ev.apiKeySource ?? null; }
-    if (ev.type === 'system' && ev.subtype === 'hook_response' && JSON.stringify(ev).includes('narvai context:')) run.hookContext = true;
+    if (ev.type === 'system' && ev.subtype === 'hook_response' && /narvai (?:context|session start):/.test(JSON.stringify(ev))) run.hookContext = true;
     if (ev.type === 'assistant') for (const c of ev.message?.content ?? []) {
       if (c.type === 'text') run.allText += c.text + '\n';
       if (c.type !== 'tool_use') continue;
