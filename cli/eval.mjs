@@ -6,7 +6,10 @@ import { cfg, git, HARNESS, home } from './ortak.mjs';
 // Evals run on the user's Claude subscription login only, never on an API key or a cloud provider account.
 const KEY_VARS = ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL', 'CLAUDE_CODE_USE_BEDROCK', 'CLAUDE_CODE_USE_VERTEX', 'CLAUDE_CODE_USE_FOUNDRY'];
 const WRITERS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit'];
-const CONTEXT = /narvai(.mjs"?|.cmd)?s+context/;
+const CONTEXT = /\bnarvai(\.mjs"?|\.cmd)?\s+context\b/;
+const RULES_FILE = /project-rules\.md$|profiles[\\/][^\\/]+[\\/]rules\.md$/;
+const SHELL_READ = /\b(?:cat|head|tail|sed|less|more|bat|type|Get-Content|gc)\b/;
+const SKILL_IN_COMMAND = /([^\\/\s"']+)[\\/]SKILL\.md/gi;
 
 function keyRisk(repos) {
   const found = KEY_VARS.filter((v) => process.env[v]).map((v) => `env ${v}`);
@@ -44,7 +47,11 @@ export function digest(events) {
       if (c.name === 'Skill' && input.skill) run.skills.push(input.skill.split(':').at(-1));
       if (c.name === 'Read') run.reads.push(path);
       if (c.name === 'Read' && skillOf(path)) run.skills.push(skillOf(path));
-      if (input.command) run.commands.push({ id: c.id, text: input.command });
+      if (input.command) {
+        run.commands.push({ id: c.id, text: input.command });
+        // Agents often read a skill with cat or head instead of the Read tool.
+        if (SHELL_READ.test(input.command)) for (const m of input.command.matchAll(SKILL_IN_COMMAND)) run.skills.push(m[1]);
+      }
     }
     if (ev.type === 'user') for (const c of Array.isArray(ev.message?.content) ? ev.message.content : []) {
       if (c.type !== 'tool_result' || !c.is_error) continue;
@@ -100,7 +107,7 @@ export function judge(sc, run, cwd) {
   const rx = (p) => new RegExp(p, 'i');
   const cmds = run.commands.map((c) => c.text);
   const blocked = new Set(run.denied.map((d) => d.id));
-  const fullContext = cmds.some((c) => CONTEXT.test(c) && !/--hook/.test(c)) || run.reads.some((p) => /project-rules.md$|profiles[\/][^\/]+[\/]rules.md$/.test(p));
+  const fullContext = cmds.some((c) => CONTEXT.test(c) && !/--hook/.test(c)) || run.reads.some((p) => RULES_FILE.test(p));
   add('repo context present', run.hookContext || fullContext);
   if (sc.fullContext) add('full rules read before the change', fullContext);
   for (const s of sc.skillsAll ?? []) add(`skill ${s}`, run.skills.includes(s));

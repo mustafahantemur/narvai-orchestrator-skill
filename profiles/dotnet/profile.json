@@ -15,7 +15,7 @@
   "contract": {
     "paths": ["**/*Endpoints.cs", "**/*Controller.cs", "**/Dtos/**", "**/*Dto.cs", "**/*Request.cs", "**/*Response.cs", "**/Enums/**"],
     "steps": [
-      "Backend first: the endpoint with its OpenAPI metadata and tests; `{check:build}`, then `{check:tests}`.",
+      "Backend first: the endpoint with its OpenAPI metadata; `{check:build}`. Tests come when the user's rules say tests are written.",
       "Regenerate the client types in the consuming repo from a backend that has this change. The user starts the backend; generated files are never edited by hand.",
       "Drift check the client against the real schema URL. A drift check that skips for lack of a URL proves nothing.",
       "Two PRs in one merge window, each naming the other. The backend merges first or together; a breaking change keeps the old shape until the client that drops it is merged."

@@ -1,6 +1,6 @@
 import { execSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { constants, setPriority, tmpdir } from 'node:os';
 import { join, matchesGlob } from 'node:path';
 import { detectStacks, git, HARNESS, readJson, repoRoot, storeFor } from './ortak.mjs';
 
@@ -83,6 +83,8 @@ function runCheck(name, cmd, repo) {
 export default async function run(args) {
   const repo = repoRoot();
   if (!repo) throw new Error('not inside a git repository');
+  // Builds inherit the priority, so a check never starves the machine the user is working on.
+  try { setPriority(constants.priority.PRIORITY_BELOW_NORMAL); } catch {}
   let store = null;
   try { store = storeFor(repo); } catch {}
   const spec = store ? readJson(join(store, 'verify.json'), null) : null;
@@ -109,7 +111,7 @@ export default async function run(args) {
     const dirs = [...new Set(files.filter((f) => matchesGlob(f, `${c.scope}/**`)).map((f) => f.split('/').slice(0, depth).join('/')))]
       .filter((d) => existsSync(join(repo, d)));
     if (!dirs.length) console.log(`  SKIPPED  ${c.name}  (--changed: no changed file under ${c.scope})`);
-    for (const d of dirs) if (!runCheck(`${c.name} ${d}`, `${cmd} ${d}`, repo)) failed++;
+    for (const d of dirs) if (!runCheck(`${c.name} ${d}`, `${cmd} ${JSON.stringify(d)}`, repo)) failed++;
   }
   for (const m of spec?.manual ?? []) console.log(`  MANUAL   ${m}`);
   if (spec && spec.remoteCi === false) console.log('  (no remote CI: this run is the gate)');

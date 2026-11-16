@@ -2,7 +2,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { backup, HARNESS } from '../cli/ortak.mjs';
 
-const OURS = /ai-store-context|store-context\.mjs|narvai-guard\.mjs|ua-auto-update\.mjs|hooks[\\/]guard\.mjs/;
+// Ours: the old hook files by name, and guard.mjs only in the form this file writes (path, then the harness name).
+const OURS = /ai-store-context|store-context\.mjs|narvai-guard\.mjs|ua-auto-update\.mjs|hooks[\\/]guard\.mjs"? (?:claude|codex)\s*$/;
 export const TOOL_MATCHER = '^(?:Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit|apply_patch|mcp__.*)$';
 
 function merge(file, h) {

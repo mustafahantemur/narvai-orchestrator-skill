@@ -1,5 +1,5 @@
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { delimiter, dirname, join, resolve } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { backup, cfg, cfgPath, HARNESS, hermesHome, home, optional, sameDir } from './ortak.mjs';
 import { linkSkills, pluginsOff } from './skills-link.mjs';
 
@@ -24,14 +24,14 @@ const CLI = join(HARNESS, 'narvai.mjs').replace(/\\/g, '/');
 export function shim() {
   const onPath = (process.env.PATH ?? '').split(delimiter).filter(Boolean);
   const writable = (d) => { try { accessSync(d, constants.W_OK); return true; } catch { return false; } };
-  const inHome = (d) => resolve(d).toLowerCase().startsWith(resolve(home()).toLowerCase());
-  const found = [join(home(), '.local', 'bin'), ...onPath].find((d) => inHome(d) && onPath.some((p) => sameDir(p, d)) && writable(d));
+  const local = join(home(), '.local', 'bin');
+  const found = onPath.some((p) => sameDir(p, local)) && writable(local) ? local : undefined;
   const dir = found ?? join(home(), '.narvai', 'bin');
   mkdirSync(dir, { recursive: true });
   const files = { narvai: `#!/bin/sh\nexec node "${CLI}" "$@"\n` };
   if (process.platform === 'win32') files['narvai.cmd'] = `@echo off\r\nnode "${CLI}" %*\r\n`;
   for (const [name, body] of Object.entries(files)) writeFileSync(join(dir, name), body, { mode: 0o755 });
-  console.log(found ? `  OK   narvai command: ${dir}` : `  TODO narvai command written to ${dir}, which is not on PATH: add it`);
+  console.log(found ? `  OK   narvai command: ${dir}` : `  TODO narvai command written to ${dir}: add that folder to PATH (or create ~/.local/bin, put it on PATH and rerun sync)`);
 }
 
 function nativeRoot() {

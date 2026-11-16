@@ -12,7 +12,7 @@
     { "name": "tests", "scripts": ["test"], "when": ["**/*.ts", "**/*.tsx"], "scope": "src/*/*", "kind": "test" }
   ],
   "lsp": { "server": "typescript-language-server", "needs": "the session opened at the folder that holds tsconfig.json" },
-  "skills": ["impeccable", "modern-web-guidance", "vercel-react-best-practices"],
+  "skills": ["impeccable", "vercel-react-best-practices"],
   "contract": {
     "paths": ["**/*.generated.ts", "**/openapi*.json", "**/openapi*.yaml"],
     "steps": [

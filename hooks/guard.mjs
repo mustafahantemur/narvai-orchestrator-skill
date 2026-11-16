@@ -1,16 +1,21 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, matchesGlob, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HARNESS, harness, home, readJson, repoRoot, storeFor } from '../cli/ortak.mjs';
+import { projectDesign } from '../cli/context.mjs';
+import { pathHit } from '../cli/next.mjs';
 
 const SHELL = /^(?:Bash|PowerShell)$/;
 const EDIT = /^(?:Edit|Write|MultiEdit|NotebookEdit|apply_patch)$/;
 const cli = () => join(HARNESS, 'narvai.mjs').replace(/\\/g, '/');
 
 export const allowPath = () => join(home(), '.narvai', 'allow.json');
-export const rules = () => [...readJson(join(HARNESS, 'hooks', 'deny.json'), {}).rules ?? [], ...readJson(join(home(), '.narvai', 'guard.json'), {}).rules ?? []];
+// A file that does not parse counts as empty, so one broken file never switches the other rules off.
+const load = (file) => { try { return readJson(file, {}); } catch { return {}; } };
+export const rules = () => [...load(join(HARNESS, 'hooks', 'deny.json')).rules ?? [], ...load(join(home(), '.narvai', 'guard.json')).rules ?? []];
+export const exceptions = () => load(allowPath());
 
 const patchPaths = (patch) => [...patch.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/gm)].map((m) => m[1].trim());
 
@@ -22,10 +27,16 @@ export function normalise(p, h) {
   return { harness: h, event: p.hook_event_name ?? '', tool, command, paths, cwd: p.cwd ?? process.cwd(), session: String(p.session_id ?? 'none') };
 }
 
+// A rule without `tool` is a shell rule. A rule whose expression does not compile is skipped, alone.
 export function denied(n, list, allow = {}, now = Date.now()) {
-  if (!SHELL.test(n.tool) && !n.tool.startsWith('mcp__')) return undefined;
-  const hit = (re, s) => !re || new RegExp(re, 'i').test(s);
-  return list.find((r) => (r.tool || r.command) && hit(r.tool, n.tool) && hit(r.command, n.command) && !(Date.parse(allow[r.id]) > now));
+  const shell = SHELL.test(n.tool);
+  const hit = (r, re, s) => { try { return new RegExp(re, r.cs ? '' : 'i').test(s); } catch { return false; } };
+  return list.find((r) => {
+    if (r.tool ? !hit(r, r.tool, n.tool) : !(r.command && shell)) return false;
+    if (r.command && !hit(r, r.command, n.command)) return false;
+    if (r.path && !n.paths.some((p) => hit(r, r.path, p.replaceAll('\\', '/')))) return false;
+    return r.fixed || !(Date.parse(allow[r.id]) > now);
+  });
 }
 
 const rel = (p, cwd) => {
@@ -36,7 +47,7 @@ const rel = (p, cwd) => {
 export function routeHits(n, routes, fired = []) {
   if (!EDIT.test(n.tool) || !n.paths.length) return [];
   const paths = n.paths.map((p) => rel(p, n.cwd));
-  return routes.filter((r) => r.when?.event === 'edit' && !fired.includes(r.id) && paths.some((p) => r.when.paths?.some((g) => matchesGlob(p, g))));
+  return routes.filter((r) => r.when?.event === 'edit' && r.when.paths && !fired.includes(r.id) && paths.some((p) => pathHit(r.when, p)));
 }
 
 function skillPath(name) {
@@ -52,7 +63,15 @@ function editContext(n) {
   if (!hits.length) return;
   mkdirSync(join(tmpdir(), 'narvai-guard'), { recursive: true });
   writeFileSync(state, JSON.stringify([...fired, ...hits.map((r) => r.id)]));
-  return hits.map((r) => `narvai ${r.id} (${r.why}): ${r.skills.filter((s) => !s.startsWith('@')).map((s) => `${s} ${skillPath(s)}`).join('; ')}`).join('\n');
+  const top = repoRoot(n.cwd);
+  let store = null;
+  try { store = top && storeFor(top); } catch {}
+  const design = top && projectDesign(top, store);
+  const named = (s) => (s === '@project-design' ? design?.path && `${design.name} ${design.path.replaceAll('\\', '/')}` : `${s} ${skillPath(s)}`);
+  return hits.map((r) => {
+    const skills = r.skills.map(named).filter(Boolean);
+    return skills.length ? `narvai ${r.id}: ${r.why}. Read before you go on, if you have not in this task: ${skills.join('; ')}` : `narvai ${r.id}: ${r.why}.`;
+  }).join('\n');
 }
 
 function sessionContext(n) {
@@ -68,8 +87,8 @@ function main() {
     const text = sessionContext(n);
     if (text) reply({ additionalContext: text });
   } else if (n.event === 'PreToolUse') {
-    const r = denied(n, rules(), readJson(allowPath(), {}));
-    if (r) return reply({ permissionDecision: 'deny', permissionDecisionReason: `${r.reason} Instead: ${r.instead} Exception, only if the user agrees: node "${cli()}" allow ${r.id}` });
+    const r = denied(n, rules(), exceptions());
+    if (r) return reply({ permissionDecision: 'deny', permissionDecisionReason: `${r.reason} Instead: ${r.instead}${r.fixed ? '' : ` Only the user can grant an exception, in their own terminal: narvai allow ${r.id}`}` });
     const text = editContext(n);
     if (text) reply({ additionalContext: text });
   }

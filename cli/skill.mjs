@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { HARNESS, out, readJson } from './ortak.mjs';
+import { HARNESS, out, readJson, repoRoot } from './ortak.mjs';
 import { profiles, slash } from './context.mjs';
 
 export function description(file) {
@@ -30,7 +30,7 @@ function scan(root, source) {
 }
 
 // registry/skills.json (written by sync) first; skills on disk it does not list are found by folder name.
-export function skillIndex(harness = HARNESS) {
+export function skillIndex(harness = HARNESS, repo = repoRoot()) {
   const reg = readJson(join(harness, 'registry', 'skills.json'), []);
   const rows = Array.isArray(reg) ? reg : Array.isArray(reg.skills) ? reg.skills : Object.entries(reg.skills ?? reg).map(([id, v]) => ({ id, ...v }));
   const fromReg = rows.filter((r) => r?.path && (r.name || r.id)).map((r) => {
@@ -40,7 +40,9 @@ export function skillIndex(harness = HARNESS) {
   const known = new Set(fromReg.map((r) => slash(r.path).toLowerCase()));
   const disk = [...scan(join(harness, 'skills'), 'own'), ...scan(join(harness, 'third-party', 'skills'), 'third-party')]
     .filter((s) => !known.has(slash(s.path).toLowerCase()));
-  return [...fromReg, ...disk];
+  // A repository's own skills come last: a name the harness also has stays the harness's.
+  const local = repo ? ['.claude', '.agents'].flatMap((d) => scan(join(repo, d, 'skills'), 'project')) : [];
+  return [...fromReg, ...disk, ...local.filter((s) => !known.has(slash(s.path).toLowerCase()))];
 }
 
 // Accepts `name`, `set/name` and the plugin form `set:name`.

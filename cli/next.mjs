@@ -1,27 +1,20 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { join, matchesGlob, relative, resolve } from 'node:path';
 import { HARNESS, out, readJson, repoRoot, storeFor } from './ortak.mjs';
-import { clip, slash } from './context.mjs';
+import { clip, projectDesign, slash } from './context.mjs';
 import { findSkill, skillIndex } from './skill.mjs';
 
 const CHECKPOINTS = { done: ['run: narvai verify', 'run: narvai tests'], contract: ['run: narvai contract'] };
 
-export const firing = (routes, event, paths) => routes.filter((r) => r.when?.event === event
-  && (!r.when.paths || paths.some((p) => r.when.paths.some((g) => matchesGlob(p, g)))));
-
-function projectDesign(repo, store) {
-  const text = ['project-profile.md', 'project-rules.md'].map((f) => store && join(store, f)).filter((f) => f && existsSync(f)).map((f) => readFileSync(f, 'utf8')).join('\n');
-  const name = /design skill:?\s*`([^`]+)`/i.exec(text)?.[1];
-  if (!name) return null;
-  const local = ['.claude', '.agents'].map((d) => join(repo, d, 'skills', name, 'SKILL.md')).find(existsSync);
-  return { name, path: local };
-}
+// `paths` narrows a route to matching files; `except` takes some of them out again (tests, stories, generated files).
+export const pathHit = (when, p) => when.paths.some((g) => matchesGlob(p, g)) && !(when.except ?? []).some((g) => matchesGlob(p, g));
+export const firing = (routes, event, paths) => routes.filter((r) => r.when?.event === event && (!r.when.paths || paths.some((p) => pathHit(r.when, p))));
 
 export function skillLines(routes, event, paths, resolveSkill) {
   const seen = new Set();
   const lines = [];
   for (const r of firing(routes, event, paths)) {
     let why = r.why;
+    if (!r.skills.length) lines.push(`note: ${r.why}`);
     for (const name of r.skills) {
       const s = resolveSkill(name);
       const key = s?.name ?? name;

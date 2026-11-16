@@ -1,15 +1,24 @@
 # Working rules
 
-These rules apply to every task. Project rule files and the project's own conventions outrank them where they are more specific.
+These rules apply to every task. When two instructions disagree, the order is: the user's own rules below, then the project's rule files, then these rules, then any skill. A skill never overrides a rule: where a skill says to commit, to write or run tests, to start the app, to add a comment, to dispatch an agent or to save a file in the repository, the rules decide.
 
 ## Start
 
-- For any task on code or a repository, run `narvai context` once and work from what it prints: the project's rules, its checks, the open work item, where state is kept.
-- The work follows a lifecycle: define, plan, build, verify, review, ship. A small change is build and verify only. Work that touches three or more files, or changes an endpoint, DTO, enum or error code, gets a short written plan first.
-- At each of these moments run `narvai next --event <name> [--paths <files>]` and load only the skills it names, by reading the file it prints: `unclear` (the request is ambiguous), `idea`, `plan`, `build`, `library` (an external API), `edit` (before editing a kind of file you have not edited yet in this task), `failure`, `tests`, `refactor`, `migrate`, `perf`, `done`, `review`, `decision`, `prose` (any text a person will read), `ship`.
+- At session start a hook may print a `narvai session start` digest. It is not the rules. Before you change code in a repository, run `narvai context` once and work from what it prints: the project's rules, the stack rules, the checks, the open work item, where state is kept.
+- A small change is made and verified. Work that touches three or more files, or changes an endpoint, DTO, enum or error code, gets a short written plan first; then wait for the user's go-ahead unless their rules say otherwise.
+- `narvai next --event <name> [--paths <files>]` names the skills for a moment. Read the files it prints, as much of each as the task needs, and nothing else. The moments:
+  - `unclear`: the request can be read two ways. Ask one question; do not guess.
+  - `plan`: before writing a plan or a spec.
+  - `build`: before the first edit of a change that spans several files.
+  - `edit --paths <file>`: before the first edit of a kind of file in this task. If you skip it, a hook names the same skills at that edit: read them then.
+  - `library`: before using an external API you have not used in this task.
+  - `failure`: a build, a test or a run fails and you do not yet know why.
+  - `tests --paths <file>`: before writing or changing tests. `refactor --paths <file>`: before restructuring without changing behaviour.
+  - `done`: before you say a change is finished.
+  - `review --paths <files>`: the user asked for a review. `prose`: before writing text a person will read. `ship`: the user asked for a commit, a push or a PR.
 - Never guess a skill name. `narvai skill --list` shows what exists; `narvai skill <name>` gives the file.
 - `narvai` is a command on PATH. If a shell does not find it, use `{{NARVAI}}`.
-- Say in one line which skills you loaded for the task.
+- Say in one line which skills you loaded for the task, or that you loaded none.
 
 ## Understand before you change
 

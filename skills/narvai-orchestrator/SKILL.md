@@ -20,7 +20,7 @@ Pick the smaller size when two fit; move up on evidence.
 | Size | What it is | Phases |
 |---|---|---|
 | TRIVIAL | typo, text, spacing, one-line mechanical edit | build, verify |
-| SMALL | small bug, a few closely related files | build, verify, self-review |
+| SMALL | small bug, one or two closely related files | build, verify, self-review |
 | STANDARD | a feature, backend and frontend, an API and its screen | define if unclear, plan, build in slices, verify, review |
 | LARGE | several modules, a long-running feature | as STANDARD, with slices handed to workers |
 | HIGH-RISK | auth, data-loss migration, breaking contract | as LARGE, with rollback and explicit approval |
@@ -36,7 +36,7 @@ At each moment run `narvai next --event <name> [--paths ...]` and read only the 
 | Define | the request is unclear, or the work is large | `unclear`, `idea` | one question at a time, your best guess attached |
 | Plan | three or more files, or a contract change | `plan` | one spec owner (`references/spec.md`); record it in the work item |
 | Build | every change | `build`, `edit`, `library`, `refactor`, `migrate` | smallest change that works; follow the patterns already in the code |
-| Verify | every change | `failure`, `tests`, `perf`, `done` | `narvai verify`; `narvai tests`; `narvai contract` when an endpoint, DTO or enum changed |
+| Verify | every change | `done`; `failure` on an unexpected failure; `tests` only when tests are being written; `perf` on a measured problem | `narvai verify`; `narvai tests`; `narvai contract` when an endpoint, DTO or enum changed |
 | Review | at `done` (self-check) and when the user accepts a review | `done`, `review`, `prose`, `decision` | a reviewer with a fresh context for STANDARD and up (`references/review.md`) |
 | Ship | the user asks for a commit, push or PR | `ship` | the user's commit rules |
 
@@ -50,7 +50,7 @@ Profiles: `narvai-kesif` (read-only search, cheap model), `narvai-uygula` (imple
 
 ## 5. Needs the user's yes first
 
-Multi-agent fan-out, repo-wide audits, a model-built knowledge graph, a document or media pass of Graphify, browser automation runs, installing a tool, any paid provider call.
+Multi-agent fan-out, repo-wide audits, a model-built knowledge graph, a document or media pass of Graphify, installing a tool, any paid provider call.
 
 ## 6. References
 

@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { constants, setPriority } from 'node:os';
 import { join } from 'node:path';
 import { git, HARNESS, readJson, storeRoot } from './ortak.mjs';
@@ -61,10 +61,12 @@ function build(args) {
   const repo = readJson(join(dir, 'repos.json'), { repos: [] }).repos.find((r) => r.name === only);
   if (!repo) throw new Error(`${only} is not in ${join(dir, 'repos.json')}`);
   const lock = join(dir, `${only}.lock`);
+  // A lock older than two hours is a crashed build, whatever process now owns that pid.
   let holder = 0;
-  try { holder = Number(readFileSync(lock, 'utf8')); } catch {}
+  try { if (Date.now() - statSync(lock).mtimeMs < 2 * 3600_000) holder = Number(readFileSync(lock, 'utf8')); } catch {}
   if (holder && alive(holder)) { console.log(`graph build for ${only} already running (pid ${holder})`); return; }
-  writeFileSync(lock, String(process.pid));
+  rmSync(lock, { force: true });
+  try { writeFileSync(lock, String(process.pid), { flag: 'wx' }); } catch { console.log(`graph build for ${only} already running`); return; }
   try {
     setPriority(constants.priority.PRIORITY_BELOW_NORMAL);
     // Commits that land while a build runs are picked up by the next pass; ponytail: at most 3 passes.

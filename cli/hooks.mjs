@@ -17,23 +17,28 @@ export function withoutBlock(text, hook) {
   return out.join('\n');
 }
 
+// The block goes last, except in front of a closing top-level `exit`, which would otherwise skip it.
 export function withBlock(text, hook, body) {
   const rest = withoutBlock(text || SHEBANG, hook);
-  return `${rest}${rest.endsWith('\n') ? '' : '\n'}${BEGIN(hook)}\n${body}\n${END(hook)}\n`;
+  const block = `${BEGIN(hook)}\n${body}\n${END(hook)}`;
+  const lines = rest.replace(/\n+$/, '').split('\n');
+  if (/^exit\b/.test(lines.at(-1))) return [...lines.slice(0, -1), block, lines.at(-1), ''].join('\n');
+  return `${rest}${rest.endsWith('\n') ? '' : '\n'}${block}\n`;
 }
 
-// Each block keeps the exit status the hook had before it, so appending never hides a failure.
+// Each block keeps the exit status the hook had before it, and does nothing when the harness is gone.
 export function blocks(cli, graphRepo) {
   const node = `node "${cli}"`;
+  const here = (cmd) => `if [ -f "${cli}" ]; then ${cmd}; fi`;
   const refresh = `(${node} graph build --only "${graphRepo}" --head >/dev/null 2>&1 &)`;
-  const keep = (lines) => ['narvai_rc=$?', ...lines, '(exit "$narvai_rc")'].join('\n');
+  const keep = (cmd) => ['narvai_rc=$?', here(cmd), '(exit "$narvai_rc")'].join('\n');
   return {
     'pre-push': ['narvai_rc=$?; [ "$narvai_rc" -eq 0 ] || exit "$narvai_rc"',
-      `${node} verify --changed || { echo "narvai verify failed. Fix it, or push with --no-verify if you accept the risk."; exit 1; }`].join('\n'),
-    'pre-commit': keep([`${node} tests >&2`]),
-    'post-commit': graphRepo ? keep([refresh]) : null,
-    'post-merge': graphRepo ? keep([refresh]) : null,
-    'post-checkout': graphRepo ? keep([`[ "$3" = 1 ] && ${refresh}`]) : null,
+      here(`${node} verify --changed || { echo "narvai verify failed. Fix it, or push with --no-verify if you accept the risk."; exit 1; }`)].join('\n'),
+    'pre-commit': keep(`${node} tests >&2 || true`),
+    'post-commit': graphRepo ? keep(refresh) : null,
+    'post-merge': graphRepo ? keep(refresh) : null,
+    'post-checkout': graphRepo ? keep(`[ "$3" = 1 ] && ${refresh}`) : null,
   };
 }
 
@@ -56,6 +61,8 @@ function graphRepoFor(repo) {
 
 export function installHooks(repo, { cli = join(HARNESS, 'narvai.mjs').replace(/\\/g, '/'), remove = false, graphRepo = graphRepoFor(repo) } = {}) {
   const dir = git(['rev-parse', '--path-format=absolute', '--git-path', 'hooks'], repo);
+  // core.hooksPath can point at a folder the repository tracks; nothing of narvai goes into a repository.
+  if (!remove && git(['ls-files', '--', dir], repo)) return [`narvai hooks: ${dir} is tracked by the repository; nothing written. Add the narvai lines to your own hook by hand if you want them.`];
   mkdirSync(dir, { recursive: true });
   undoOldPrePush(dir);
   const lines = [`narvai hooks: ${dir}${graphRepo ? `  (graph refresh for ${graphRepo})` : ''}`];

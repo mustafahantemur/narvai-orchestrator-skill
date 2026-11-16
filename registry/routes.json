@@ -1,5 +1,5 @@
 {
-  "about": "Which skill at which moment. Curated by hand. The backbone is the software lifecycle of addyosmani/agent-skills (define, plan, build, verify, review, ship): each phase has one agent-skills owner, and stack, UI, security and simplicity skills attach to a phase as specialists. The agent-skills router text is not loaded; this file is the router. Where an agent-skills skill disagrees with the user's rules (when tests are written, when to commit, how much ceremony a small task gets), the user's rules win. `listed` skills are visible to every agent; every other skill is reached through a route or `narvai skill <name>`. `@project-design` is the design skill named in the project profile. At most three skills per route.",
+  "about": "Which skill at which moment. Curated by hand. The backbone is the software lifecycle of addyosmani/agent-skills (define, plan, build, verify, review, ship): each phase has one agent-skills owner, and stack, UI, security and simplicity skills attach to a phase as specialists. The agent-skills router text is not loaded; this file is the router. Where an agent-skills skill disagrees with the user's rules (when tests are written, when to commit, how much ceremony a small task gets), the user's rules win. `listed` skills are visible to every agent; every other skill is reached through a route or `narvai skill <name>`. `@project-design` is the design skill named in the project profile. At most three skills per route. A route may carry `when.except` (globs taken out again) and may have no skills at all: then its `why` is the whole message.",
   "phases": {
     "define": "Small tasks skip it. Used when the request is unclear or the work is large.",
     "plan": "Three or more files, or a contract change. Otherwise skip.",
@@ -52,7 +52,7 @@
         "spec-driven-development",
         "planning-and-task-breakdown"
       ],
-      "why": "work that touches three or more files or changes a contract"
+      "why": "work that touches three or more files or changes a contract; the plan and the spec go under the store work item, never into the repository"
     },
     {
       "id": "build",
@@ -63,7 +63,7 @@
       "skills": [
         "incremental-implementation"
       ],
-      "why": "multi-file implementation in small verifiable slices"
+      "why": "multi-file implementation in small verifiable slices; when to commit and when to test are the user's rules, not the skill's"
     },
     {
       "id": "library",
@@ -74,7 +74,7 @@
       "skills": [
         "source-driven-development"
       ],
-      "why": "code against an external library or framework API: read its current documentation first (Context7)"
+      "why": "code against an external library or framework API: read its current documentation first (Context7); cite sources in your reply, not in code comments"
     },
     {
       "id": "interface",
@@ -84,7 +84,9 @@
         "paths": [
           "**/*Endpoints.cs",
           "**/*Controller.cs",
-          "**/Contracts/**/*.cs"
+          "**/*Dto.cs",
+          "**/*Request.cs",
+          "**/*Response.cs"
         ]
       },
       "skills": [
@@ -103,6 +105,11 @@
           "**/*.jsx",
           "**/*.css",
           "**/*.scss"
+        ],
+        "except": [
+          "**/*.test.*",
+          "**/*.spec.*",
+          "**/*.stories.*"
         ]
       },
       "skills": [
@@ -119,13 +126,39 @@
         "event": "edit",
         "paths": [
           "**/*.tsx",
-          "**/*.jsx"
+          "**/*.jsx",
+          "**/use-*.ts"
+        ],
+        "except": [
+          "**/*.test.*",
+          "**/*.spec.*",
+          "**/*.stories.*"
         ]
       },
       "skills": [
         "vercel-react-best-practices"
       ],
       "why": "React component or data fetching change"
+    },
+    {
+      "id": "security-edit",
+      "phase": "build",
+      "when": {
+        "event": "edit",
+        "paths": [
+          "**/*Auth*",
+          "**/*Permission*",
+          "**/*Capabilit*",
+          "**/*Token*",
+          "**/*Crypto*",
+          "**/*Payment*",
+          "**/Iam/**"
+        ]
+      },
+      "skills": [
+        "security-and-hardening"
+      ],
+      "why": "code on an authentication, permission, token or payment path"
     },
     {
       "id": "i18n",
@@ -149,9 +182,9 @@
       "when": {
         "event": "edit",
         "paths": [
-          "**/*Repository*.cs",
+          "**/Infrastructure/**/*Repository*.cs",
           "**/Persistence/**/*.cs",
-          "**/Queries/**/*.cs"
+          "**/*DbContext*.cs"
         ]
       },
       "skills": [
@@ -165,7 +198,6 @@
       "when": {
         "event": "edit",
         "paths": [
-          "**/Migrations/**",
           "**/*Configuration.cs",
           "**/*.sql"
         ]
@@ -175,6 +207,34 @@
         "database-migrations"
       ],
       "why": "PostgreSQL schema, index or query"
+    },
+    {
+      "id": "deps",
+      "phase": "build",
+      "when": {
+        "event": "edit",
+        "paths": [
+          "**/Directory.Packages.props",
+          "**/*.csproj",
+          "**/package.json"
+        ]
+      },
+      "skills": [],
+      "why": "a package added or upgraded: check its current version and its license for that version first"
+    },
+    {
+      "id": "generated",
+      "phase": "build",
+      "when": {
+        "event": "edit",
+        "paths": [
+          "**/*.generated.ts",
+          "**/*.Designer.cs",
+          "**/*ModelSnapshot.cs"
+        ]
+      },
+      "skills": [],
+      "why": "a generated file: do not edit it by hand, regenerate it"
     },
     {
       "id": "refactor",
@@ -225,22 +285,7 @@
       "skills": [
         "debugging-and-error-recovery"
       ],
-      "why": "a build, test or runtime failure, or a wrong value"
-    },
-    {
-      "id": "tests-dotnet",
-      "phase": "verify",
-      "when": {
-        "event": "tests",
-        "paths": [
-          "**/*.cs"
-        ]
-      },
-      "skills": [
-        "test-anti-patterns",
-        "assertion-quality"
-      ],
-      "why": "writing or changing .NET tests"
+      "why": "a build, test or runtime failure, or a wrong value; no new test and no app start unless the user's rules allow it"
     },
     {
       "id": "tests-react",
@@ -248,10 +293,10 @@
       "when": {
         "event": "tests",
         "paths": [
-          "**/*.tsx",
-          "**/*.jsx",
-          "**/*.test.ts",
-          "**/*.spec.ts"
+          "**/*.test.tsx",
+          "**/*.spec.tsx",
+          "**/*.test.jsx",
+          "**/use-*.test.ts"
         ]
       },
       "skills": [
@@ -302,11 +347,10 @@
         "event": "done"
       },
       "skills": [
-        "ponytail-review",
         "deslop",
         "unslop"
       ],
-      "why": "before calling code done: over-engineering and code slop check on the diff, and AI tells out of every text the change adds (comments, UI copy, error messages, commit and PR text)"
+      "why": "before calling code done: code slop out of the diff, and AI tells out of every text the change adds (comments, UI copy, error messages)"
     },
     {
       "id": "review",
@@ -350,6 +394,22 @@
         "react-reviewer"
       ],
       "why": "React review lens: hook correctness, server and client boundary, rendering"
+    },
+    {
+      "id": "review-tests-dotnet",
+      "phase": "review",
+      "when": {
+        "event": "review",
+        "paths": [
+          "**/*Tests.cs",
+          "**/*Test.cs"
+        ]
+      },
+      "skills": [
+        "test-anti-patterns",
+        "assertion-quality"
+      ],
+      "why": "audit of .NET tests: anti-patterns and assertion quality"
     },
     {
       "id": "review-ui",
@@ -419,8 +479,7 @@
         "event": "ship"
       },
       "skills": [
-        "git-workflow-and-versioning",
-        "shipping-and-launch"
+        "git-workflow-and-versioning"
       ],
       "why": "the user asked for a commit, push or pull request; the user's commit rules override the skill's"
     }

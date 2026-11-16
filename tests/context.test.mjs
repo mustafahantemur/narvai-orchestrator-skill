@@ -37,9 +37,9 @@ test('project-rules.md: the include line is replaced by the shared file, a missi
   writeFileSync(join(store, '..', 'shared', 'rules.md'), '# shared\n\n- s1\n');
   mkdirSync(store, { recursive: true });
   writeFileSync(join(store, 'project-rules.md'), 'include: ../shared/rules.md\n# own\n- o1\n');
-  assert.deepEqual(projectRules(store).lines, ['# shared', '- s1', '# own', '- o1']);
+  assert.deepEqual(projectRules(store).lines, ['# own', '- o1', '# shared', '- s1']);
   writeFileSync(join(store, 'project-rules.md'), 'include: ../nope.md\n- o1\n');
-  assert.match(projectRules(store).lines[0], /^WARN include not found: .*nope\.md$/);
+  assert.match(projectRules(store).lines.at(-1), /^WARN include not found: .*nope\.md$/);
   writeFileSync(join(store, 'project-rules.md'), '- o1\n\ninclude: later lines are plain text\n');
   assert.deepEqual(projectRules(store).lines, ['- o1', 'include: later lines are plain text']);
 });
@@ -80,7 +80,7 @@ test('profile checks take package.json script names, else the fallback, else dro
   assert.equal(fillStep('a `{check:lint}` b `{script:gen|api:generate}`', repo, [{ name: 'lint', run: 'L' }]), 'a `L` b `no package.json script among gen, api:generate`');
 });
 
-test('narvai context stays within 90 lines, 25 with --hook', () => {
+test('narvai context stays within 90 lines; --hook is a short digest that sends the agent to the full rules', () => {
   const t = temp();
   const repo = join(t, 'repo'), store = join(t, 'store', 'repo');
   mkdirSync(repo);
@@ -95,10 +95,13 @@ test('narvai context stays within 90 lines, 25 with --hook', () => {
   delete env.CODEX_HOME;
   const run = (...a) => execFileSync('node', [join(HARNESS, 'narvai.mjs'), 'context', ...a], { cwd: repo, env, encoding: 'utf8' }).trimEnd().split('\n');
   const full = run();
-  assert.equal(full.length, 90);
+  assert.ok(full.length <= 90, String(full.length));
   assert.match(full.join('\n'), /^stacks: dotnet$/m);
-  assert.match(full.at(-1), /^\.\.\. \d+ more lines in .*project-rules\.md$/);
+  assert.match(full.join('\n'), /^\.\.\. \d+ more lines in .*project-rules\.md$/m);
+  assert.match(full.join('\n'), /^stack rules \(/m);
   const hook = run('--hook');
-  assert.equal(hook.length, 25);
-  assert.match(hook.at(-1), /^\.\.\. \d+ more lines in/);
+  assert.ok(hook.length <= 6, hook.join('|'));
+  assert.match(hook[0], /^narvai session start: .*stacks: dotnet/);
+  assert.ok(hook.at(-1).includes('run `narvai context`'));
+  assert.ok(!hook.join('\n').includes('- rule 0'));
 });

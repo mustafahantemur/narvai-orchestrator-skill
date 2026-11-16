@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { cfg, cfgPath, HARNESS, home, readJson, sameDir, skillTargets, tilde, which } from './ortak.mjs';
+import { rules as guardRules } from '../hooks/guard.mjs';
 import { graphRows } from './graph.mjs';
 import runSync from './sync.mjs';
 import { cachedPlugins, claudePlugins, frontmatter, indexOf, skillInventory } from './usage.mjs';
@@ -177,6 +178,8 @@ function hooks() {
     const codex = hookCommands(codexHooks());
     rows.push(codex.some((c) => /[\\/]guard\.mjs/.test(c)) ? ok('Codex hook guard.mjs registered') : warn('Codex hook guard.mjs not registered  (run sync)', true));
   }
+  const broken = guardRules().filter((r) => [r.command, r.tool, r.path].some((re) => { try { if (re) new RegExp(re); return false; } catch { return true; } })).map((r) => r.id);
+  rows.push(broken.length ? fail(`guard rules whose expression does not compile (they are skipped): ${list(broken)}`) : ok(`guard rules compile (${guardRules().length})`));
   const gone = missingHookFiles([...claude, ...hookCommands(codexHooks())]);
   rows.push(gone.length ? fail(`hooks point at files that do not exist: ${list(gone)}`, true) : ok('every hook command points at an existing file'));
   return rows;

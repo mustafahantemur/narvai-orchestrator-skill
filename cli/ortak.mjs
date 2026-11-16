@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, symlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, matchesGlob, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -44,6 +44,15 @@ function* walk(dir, rel = '') {
   }
 }
 
+// git() has the 1 MB default buffer; a large repo's file list exceeds it.
+export function repoFiles(repo) {
+  try {
+    return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: repo, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\n').filter(Boolean);
+  } catch { return []; }
+}
+
+// Tracked and unignored files when git knows the folder, so ignored build output is never walked.
 export function detectStacks(repo, profilesDir = join(HARNESS, 'profiles')) {
   const left = new Map();
   for (const d of existsSync(profilesDir) ? readdirSync(profilesDir) : []) {
@@ -52,7 +61,8 @@ export function detectStacks(repo, profilesDir = join(HARNESS, 'profiles')) {
   }
   const found = [];
   if (!left.size) return found;
-  for (const f of walk(repo)) {
+  const listed = repoFiles(repo);
+  for (const f of listed.length ? listed : walk(repo)) {
     for (const [name, globs] of left) if (globs.some((g) => matchesGlob(f, g))) { found.push(name); left.delete(name); }
     if (!left.size) break;
   }
@@ -82,18 +92,6 @@ export const hermesHome = () => (!process.env.NARVAI_HOME && process.env.HERMES_
 export const skillTargets = () => [join(home(), '.claude', 'skills'), join(home(), '.agents', 'skills'), join(home(), '.gemini', 'config', 'skills'), join(home(), '.pi', 'agent', 'skills')]
   .filter((d) => existsSync(dirname(d)));
 export const sameDir = (a, b) => { try { return realpathSync(a) === realpathSync(b); } catch { return false; } };
-
-export function link(src, dst) {
-  if (sameDir(src, dst)) return false;
-  if (lstatSync(dst, { throwIfNoEntry: false })) {
-    const bak = join(home(), '.narvai', 'backups', 'skills', `${dst.split(/[\\/]/).slice(-3).join('_')}.${Date.now()}`);
-    mkdirSync(dirname(bak), { recursive: true });
-    renameSync(dst, bak);
-  }
-  mkdirSync(dirname(dst), { recursive: true });
-  symlinkSync(src, dst, 'junction');
-  return true;
-}
 
 export async function optional(rel, name) {
   const p = join(HARNESS, rel);

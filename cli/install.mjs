@@ -14,6 +14,7 @@ function installThirdParty() {
     for (const a of s.agents ?? []) {
       const agents = join(home(), '.claude', 'agents');
       mkdirSync(agents, { recursive: true });
+      backup(join(agents, `${a}.md`));
       copyFileSync(join(HARNESS, 'third-party', 'agents', `${a}.md`), join(agents, `${a}.md`));
     }
     const done = s.done && (s.done.startsWith('which:') ? which(s.done.slice(6)) : existsSync(tilde(s.done.slice(5))));

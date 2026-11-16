@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, matchesGlob, relative, resolve } from 'node:path';
-import { appDir, git, HARNESS, harness, home, out, readJson, repoRoot, storeFor, which } from './ortak.mjs';
+import { appDir, git, HARNESS, harness, home, out, readJson, repoFiles, repoRoot, storeFor, which } from './ortak.mjs';
 
 export const slash = (p) => p.replace(/\\/g, '/');
 const kb = (f) => `${(statSync(f).size / 1024).toFixed(1)} KB`;
@@ -13,13 +13,7 @@ export function profiles(dir = join(HARNESS, 'profiles')) {
     .filter((p) => p.name);
 }
 
-// git() in ortak has the 1 MB default buffer; a large repo's file list exceeds it.
-export function repoFiles(repo) {
-  try {
-    return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: repo, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
-      .split('\n').filter(Boolean);
-  } catch { return []; }
-}
+export { repoFiles };
 
 export const stacksOf = (files, profs) => profs.filter((p) => p.detect?.some((g) => files.some((f) => matchesGlob(f, g))));
 
@@ -127,7 +121,17 @@ export function projectRules(store) {
   if (!inc) return { head: `project rules (${slash(f)}):`, lines: lines.filter((l) => l.trim()), path: slash(f) };
   const g = resolve(store, inc);
   const shared = existsSync(g) ? readFileSync(g, 'utf8').split(/\r?\n/) : [`WARN include not found: ${slash(g)}`];
-  return { head: `project rules (${slash(f)} + ${slash(g)}):`, lines: [...shared, ...lines.slice(1)].filter((l) => l.trim()), path: slash(f) };
+  // The repository's own lines first: when the list is cut, the most specific rules survive.
+  return { head: `project rules (${slash(f)} + ${slash(g)}):`, lines: [...lines.slice(1), ...shared].filter((l) => l.trim()), path: slash(f) };
+}
+
+// A project names its design skill in the store: Design skill: `<name>`. It usually lives in the repository itself.
+export function projectDesign(repo, store) {
+  const text = ['project-profile.md', 'project-rules.md'].map((f) => store && join(store, f)).filter((f) => f && existsSync(f)).map((f) => readFileSync(f, 'utf8')).join('\n');
+  const name = /design skill:?\s*`([^`]+)`/i.exec(text)?.[1];
+  if (!name) return null;
+  const local = ['.claude', '.agents'].map((d) => join(repo, d, 'skills', name, 'SKILL.md')).find(existsSync);
+  return { name, path: local };
 }
 
 export function clip(lines, limit, tail = 'more') {
@@ -137,7 +141,7 @@ export function clip(lines, limit, tail = 'more') {
 
 export default async function run(args) {
   const hook = args.includes('--hook');
-  const limit = hook ? 25 : 90;
+  const limit = 90;
   const cwd = process.cwd();
   const repo = repoRoot(cwd);
   if (!repo) { if (hook) return; throw new Error('not inside a git repository: cd into one'); }
@@ -151,6 +155,19 @@ export default async function run(args) {
   const branch = git(['branch', '--show-current'], repo) || `detached ${git(['rev-parse', '--short', 'HEAD'], repo)}`;
   const files = repoFiles(repo);
   const stacks = stacksOf(files, profiles());
+  const design = projectDesign(repo, store);
+  const designLine = design?.path ? `design skill, read before UI work: ${design.name} ${slash(design.path)}` : null;
+  // Session start gets a digest that cannot be mistaken for the rules: the agent still has to ask for them.
+  if (hook) {
+    const { checks } = resolveChecks(repo, stacks, store);
+    const work = workLines(workItems(store), branch).filter((l) => !l.startsWith('WARN on "continue"'));
+    return out([
+      `narvai session start: ${slash(repo)} @ ${branch}; stacks: ${stacks.map((p) => p.name).join(', ') || 'none'}; checks: ${checks.map((c) => c.name).join(', ') || 'none'}`,
+      ...work,
+      ...(designLine ? [designLine] : []),
+      'This is a digest, not the rules. Before you change code here, run `narvai context`: it prints the project rules and the stack rules.',
+    ]);
+  }
   const lines = [`narvai context: ${slash(repo)} @ ${branch} (${harness()})`];
 
   const rf = ruleFiles(repo, cwd);
@@ -161,7 +178,6 @@ export default async function run(args) {
   const nested = files.filter((f) => /\/(CLAUDE|AGENTS)\.md$/.test(f) && f !== '.claude/CLAUDE.md');
   if (nested.length) lines.push(`rules nested, loaded when work reaches the folder: ${nested.slice(0, 6).join(', ')}${nested.length > 6 ? ` (+${nested.length - 6})` : ''}`);
   const stackRules = stacks.map((p) => join(p.dir, 'rules.md')).filter(existsSync);
-  if (hook && stackRules.length) lines.push(`stack rules, read before editing: ${stackRules.map((f) => `${slash(f)} ${kb(f)}`).join(', ')}`);
   lines.push(`stacks: ${stacks.map((p) => p.name).join(', ') || 'none detected (no profile matches: add profiles/<stack>)'}`);
 
   const profile = store && join(store, 'project-profile.md');
@@ -175,12 +191,13 @@ export default async function run(args) {
     lines.push(`lsp ${p.name}: ${p.lsp.server} ${which(p.lsp.server) ? 'on PATH' : 'NOT on PATH'}; needs ${p.lsp.needs}`);
   }
 
-  if (!hook) for (const f of stackRules) lines.push(`stack rules (${slash(f)}):`, ...readFileSync(f, 'utf8').split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#')));
+  if (designLine) lines.push(designLine);
   if (store) {
     const pr = projectRules(store);
     lines.push(pr.head);
-    const room = limit - lines.length;
-    lines.push(...clip(pr.lines, Math.max(room, 1), `more lines in ${pr.path}`));
+    const room = limit - lines.length - stackRules.length * 20;
+    lines.push(...clip(pr.lines, Math.max(room, 10), `more lines in ${pr.path}`));
   }
+  for (const f of stackRules) lines.push(`stack rules (${slash(f)}):`, ...readFileSync(f, 'utf8').split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('#')));
   out(clip(lines, limit, 'lines cut'));
 }
