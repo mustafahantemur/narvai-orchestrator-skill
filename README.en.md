@@ -13,7 +13,7 @@ keeps the project store outside the repository and enforces the "done" gate (`ve
 Orca (workspace, worktrees)
   ├─ Claude Code    Claude subscription, its own CLI
   ├─ Codex          ChatGPT subscription, its own CLI
-  └─ Hermes         optional; the Claude subscription is off by default
+  └─ Hermes         optional; main model Codex (ChatGPT subscription)
 Antigravity, Pi     the same skills and rules
 AgentMemory         shared local memory for all of them (MCP; the memory provider in Hermes)
 ```
@@ -86,8 +86,9 @@ do by hand. Running it again is safe, and it backs up every file it changes unde
   (`AGENTMEMORY_FORCE_PROXY=1`).
 - In Hermes it stops borrowing the Claude and Codex logins, sets the skill folders and a view of the Claude plugin skills,
   makes AgentMemory the memory provider and adds the Context7 MCP server. With `adoOrg` in the config it adds the Azure
-  DevOps MCP server with its write tools excluded. `--claude-subscription` installs the Claude DirectSDK plugin and makes
-  it the main model.
+  DevOps MCP server with its write tools excluded. It makes Codex the main model (`openai-codex`, `hermesModel` in the
+  config, default `gpt-5.6-sol`); `--claude-subscription` installs the Claude DirectSDK plugin and makes it the main model
+  instead.
 - In Codex it turns on the `CLAUDE.md` fallback for project instructions and turns off the import sync that copies
   Claude content.
 - When Orca is closed it replaces Hermes' `--yolo` argument with `--checkpoints`, sets the worktree folder to
@@ -102,8 +103,7 @@ codex login                                   # sign in to the Codex CLI
 .\scripts\move-app-homes.ps1 -Apply           # with every agent app closed
 
 # only if you use Hermes
-hermes auth add openai-codex --type oauth     # ChatGPT subscription inside Hermes
-hermes fallback add                           # Codex takes over when the main model's limit is reached
+hermes auth add openai-codex --type oauth     # Hermes' main model is Codex; sign in with the ChatGPT subscription
 ```
 
 Open Antigravity once and sign in with your Google account.
@@ -155,7 +155,7 @@ A decision saved again with the same type and ID supersedes the old one. Recall 
 
 - The Hermes catalog lists the AgentMemory plugin for Linux and macOS only. On Windows, mirroring the built-in
   `MEMORY.md` writes needs POSIX file locking and does not run. Saving, recall, search and conversation capture work.
-- The Claude subscription in Hermes is off by default. The DirectSDK plugin runs the unmodified `claude` CLI with your
+- The Claude subscription in Hermes is off by default; the main model is Codex. The DirectSDK plugin runs the unmodified `claude` CLI with your
   own login, but Anthropic restricts using the subscription from third-party tools and that use can be billed as extra
   usage. Check Anthropic's terms, and on a Team or Enterprise plan your company policy, before you turn it on.
   `node narvai.mjs setup --claude-subscription` enables the plugin and makes it the main model.

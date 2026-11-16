@@ -134,7 +134,7 @@ else {
     Step 'installing Hermes (official installer: hermes-agent.nousresearch.com/install.ps1)' { iex (irm 'https://hermes-agent.nousresearch.com/install.ps1') }
     $Manual.Add('Hermes: open a new terminal so `hermes` resolves, then rerun this script.')
 }
-$Manual.Add('Hermes + ChatGPT subscription: hermes auth add openai-codex --type oauth, then: hermes fallback add')
+$Manual.Add('Hermes main model is Codex; sign in with the ChatGPT subscription: hermes auth add openai-codex --type oauth')
 
 $winget = @(
     @{ Id = 'StablyAI.Orca';      Name = 'Orca';        Probe = { Have 'orca' -or (Test-Path "$env:LOCALAPPDATA\Programs\orca") } }

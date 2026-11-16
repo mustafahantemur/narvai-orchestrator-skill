@@ -205,7 +205,13 @@ else {
     hset('model.default', cfg.hermesModel ?? 'claude-opus-5-5[1m]');
     hset('model.base_url', '');
   });
-  todo.push('optional, Codex in Hermes: hermes auth add openai-codex --type oauth, then: hermes fallback add');
+  else step('primary model: Codex (ChatGPT subscription)', () => {
+    hset('model.provider', 'openai-codex');
+    hset('model.default', cfg.hermesModel ?? 'gpt-5.6-sol');
+    hset('model.base_url', 'https://chatgpt.com/backend-api/codex');
+    const auth = join(hermesHome, 'auth.json');
+    if (!(existsSync(auth) && readFileSync(auth, 'utf8').includes('"openai-codex"'))) todo.push('Codex login for Hermes: hermes auth add openai-codex --type oauth');
+  });
 }
 
 console.log('Codex');

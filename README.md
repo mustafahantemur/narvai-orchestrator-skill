@@ -13,7 +13,7 @@ doğru skill'leri seçer, store'u repo dışında tutar ve "done" kapısını (`
 Orca (çalışma alanı, worktree'ler)
   ├─ Claude Code    Claude aboneliği, kendi CLI'ı
   ├─ Codex          ChatGPT aboneliği, kendi CLI'ı
-  └─ Hermes         isteğe bağlı; Claude aboneliği varsayılan olarak kapalı
+  └─ Hermes         isteğe bağlı; ana model Codex (ChatGPT aboneliği)
 Antigravity, Pi     aynı skill'ler ve kurallar
 AgentMemory         hepsinin ortak, yerel hafızası (MCP; Hermes'te memory provider)
 ```
@@ -84,8 +84,8 @@ node narvai.mjs setup [--root D:\AI] [--claude-subscription] [--dry-run]
   olarak ekler. MCP köprüsü server kapalıysa ayrı bir depoya yazmaz, hata verir (`AGENTMEMORY_FORCE_PROXY=1`).
 - Hermes'te Claude ve Codex login'lerini ödünç almayı kapatır, skill klasörlerini ve Claude plugin skill'lerinin
   görünümünü kurar, AgentMemory'yi memory provider yapar ve Context7 MCP'sini ekler. Config'de `adoOrg` varsa Azure
-  DevOps MCP'sini yazma tool'ları kapalı olarak ekler. `--claude-subscription` Claude DirectSDK plugin'ini kurar ve ana
-  model yapar.
+  DevOps MCP'sini yazma tool'ları kapalı olarak ekler. Ana modeli Codex yapar (`openai-codex`, config'de `hermesModel`,
+  varsayılan `gpt-5.6-sol`); `--claude-subscription` bunun yerine Claude DirectSDK plugin'ini kurar ve ana model yapar.
 - Codex'te proje talimatı için `CLAUDE.md` fallback'ini açar, Claude içeriğini kopyalayan import sync'ini kapatır.
 - Orca kapalıysa Hermes argümanını `--yolo` yerine `--checkpoints` yapar, worktree klasörünü `<kök>\Worktrees` olarak
   ayarlar ve varsayılan agent'ı Claude Code yapar (config'de `orcaDefaultAgent`: `claude`, `codex` ya da `hermes`).
@@ -98,8 +98,7 @@ codex login                                   # Codex CLI'a giriş
 .\scripts\move-app-homes.ps1 -Apply           # tüm agent uygulamaları kapalıyken
 
 # yalnız Hermes kullanacaksan
-hermes auth add openai-codex --type oauth     # Hermes içinde ChatGPT aboneliği
-hermes fallback add                           # ana model limiti dolunca Codex devralır
+hermes auth add openai-codex --type oauth     # Hermes'in ana modeli Codex, ChatGPT aboneliğiyle giriş
 ```
 
 Antigravity'yi bir kez açıp Google hesabınla giriş yap.
@@ -151,7 +150,7 @@ Aynı tip ve ID ile kaydedilen karar eskisini supersede eder. Recall yalnız gü
 
 - Hermes'in AgentMemory plugin'i katalogda yalnız Linux ve macOS için listelenir. Windows'ta built-in `MEMORY.md`
   yazımlarının aynalanması POSIX dosya kilidi istediği için çalışmaz. Kayıt, recall, arama ve konuşma yakalama çalışır.
-- Hermes'te Claude aboneliği varsayılan olarak kapalıdır. DirectSDK plugin'i değiştirilmemiş `claude` CLI'ını senin
+- Hermes'te Claude aboneliği varsayılan olarak kapalıdır, ana model Codex'tir. DirectSDK plugin'i değiştirilmemiş `claude` CLI'ını senin
   login'inle çalıştırır, ama Anthropic aboneliğin üçüncü parti araçlardan kullanımını sınırlıyor ve bu kullanım ek ücretli
   kullanıma (extra usage) düşebilir. Açmadan önce Anthropic'in koşullarını ve Team ya da Enterprise planda şirket
   politikasını kontrol et. `node narvai.mjs setup --claude-subscription` plugin'i açar ve ana model yapar.
