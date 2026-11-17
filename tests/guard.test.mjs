@@ -24,29 +24,6 @@ test('generic rules block recursive search from a filesystem root only', () => {
   }
 });
 
-const user = join(home(), '.narvai', 'guard.json');
-test('user rules: app start, watch, compose and Azure DevOps writes', { skip: !existsSync(user) && 'no ~/.narvai/guard.json' }, () => {
-  const list = readJson(user).rules;
-  const blocked = {
-    'dotnet run --project src/Api': 'app-run', 'dotnet watch': 'app-run', 'npm run dev': 'app-run', 'pnpm dev': 'app-run',
-    'yarn start': 'app-run', 'npx next dev': 'app-run', 'docker compose -f x.yml up -d': 'compose-up', 'docker-compose up': 'compose-up',
-    'tsc --watch': 'watch-build', 'az pipelines run --name ci': 'ado-cli-write', 'az boards work-item update --id 1': 'ado-cli-write',
-    'az repos pr update --id 3 --auto-complete true': 'ado-cli-write',
-  };
-  for (const [c, id] of Object.entries(blocked)) assert.equal(idFor(list, c), id, c);
-  for (const c of ['dotnet build -nodeReuse:false', 'dotnet test', 'npm run build', 'npm test', 'git push origin feat/x', 'docker compose ps',
-    'az repos pr create --title t --source-branch a', 'az pipelines runs list', 'az boards work-item show --id 1', 'vitest run --watch=false']) {
-    assert.equal(idFor(list, c), undefined, c);
-  }
-  const mcp = (tool, input) => denied({ tool, command: JSON.stringify(input), paths: [], cwd: '.' }, list)?.id;
-  assert.equal(mcp('mcp__azure-devops__pipelines_write', { action: 'run_pipeline' }), 'ado-mcp-write');
-  assert.equal(mcp('mcp__azure-devops__wiki_upsert_page', {}), 'ado-mcp-write');
-  assert.equal(mcp('mcp__azure-devops__repo_pull_request_write', { action: 'vote' }), 'ado-mcp-pr');
-  assert.equal(mcp('mcp__azure-devops__repo_pull_request_write', { action: 'create' }), undefined);
-  assert.equal(mcp('mcp__azure-devops__pipelines_run', { action: 'list' }), undefined);
-  assert.equal(mcp('mcp__azure-devops__wit_work_item', { action: 'get' }), undefined);
-});
-
 test('a live exception lifts a rule until it expires', () => {
   const now = Date.parse('2026-11-16T12:00:00Z');
   const n = shell('find / -name x');

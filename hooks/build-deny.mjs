@@ -54,17 +54,17 @@ const rules = [
   {
     id: 'guard-files-shell',
     fixed: true,
-    command: r`\.narvai[\\/](?:allow|guard)\.json`,
-    reason: "The guard's rule and exception files belong to the user.",
-    instead: 'ask the user to change them.',
+    command: r`\.narvai[\\/](?:(?:allow|guard)\.json|guard\.log)`,
+    reason: "The guard's rule, exception and log files are not edited directly.",
+    instead: 'change the rules in their source and run narvai guard apply; an exception is the user\'s to grant.',
   },
   {
     id: 'guard-files-edit',
     fixed: true,
     tool: r`^(?:Edit|Write|MultiEdit|NotebookEdit|apply_patch)$`,
-    path: r`(?:^|/)\.narvai/(?:allow|guard)\.json$`,
-    reason: "The guard's rule and exception files belong to the user.",
-    instead: 'ask the user to change them.',
+    path: r`(?:^|/)\.narvai/(?:(?:allow|guard)\.json|guard\.log)$`,
+    reason: "The guard's rule, exception and log files are not edited directly.",
+    instead: 'change the rules in their source and run narvai guard apply; an exception is the user\'s to grant.',
   },
 ];
 

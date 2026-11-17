@@ -5,6 +5,7 @@ import { basename, join } from 'node:path';
 import { cfg, cfgPath, HARNESS, home, memory, readJson, sameDir, skillTargets, tilde, which } from './ortak.mjs';
 import { rules as guardRules } from '../hooks/guard.mjs';
 import { graphRows } from './graph.mjs';
+import { lastChangeLine } from './guard.mjs';
 import runSync from './sync.mjs';
 import { cachedPlugins, claudePlugins, frontmatter, indexOf, skillInventory } from './usage.mjs';
 
@@ -180,6 +181,7 @@ function hooks() {
   }
   const broken = guardRules().filter((r) => [r.command, r.tool, r.path].some((re) => { try { if (re) new RegExp(re); return false; } catch { return true; } })).map((r) => r.id);
   rows.push(broken.length ? fail(`guard rules whose expression does not compile (they are skipped): ${list(broken)}`) : ok(`guard rules compile (${guardRules().length})`));
+  rows.push(ok(`guard rules of your own: ${lastChangeLine()}`));
   const gone = missingHookFiles([...claude, ...hookCommands(codexHooks())]);
   rows.push(gone.length ? fail(`hooks point at files that do not exist: ${list(gone)}`, true) : ok('every hook command points at an existing file'));
   return rows;

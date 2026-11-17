@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { denied } from '../hooks/guard.mjs';
@@ -75,6 +75,26 @@ test('root search: text that only mentions a search, and harmless look-alikes, p
     'gh pr create --body "guard blocks rg x / now"', 'ls -r /', 'ls -la /', 'cd /c/Projects/AI && find . -name x', 'cd / && pwd', 'grep foo /etc/hosts']) {
     assert.equal(idFor(c), undefined, c);
   }
+});
+
+test('guard apply: puts validated rules in force, logs the change, refuses a broken source and leaves the old rules', () => {
+  const h = home();
+  const src = join(h, 'rules.json');
+  const cli = (...a) => spawnSync(process.execPath, [join(HARNESS, 'narvai.mjs'), 'guard', ...a], { encoding: 'utf8', env: { ...process.env, NARVAI_HOME: h } });
+  const ids = () => readJson(join(h, '.narvai', 'guard.json')).rules.map((r) => r.id);
+  writeFileSync(src, JSON.stringify({ rules: [{ id: 'no-zz', command: 'zzdanger', reason: 'r', instead: 'i' }] }));
+  assert.match(cli('apply', src).stdout, /\+no-zz/);
+  assert.deepEqual(ids(), ['no-zz']);
+  assert.deepEqual(JSON.parse(readFileSync(join(h, '.narvai', 'guard.log'), 'utf8').trim()).added, ['no-zz']);
+  assert.equal(hook(bash('zzdanger'), h)?.permissionDecision, 'deny');
+  assert.match(cli('apply', src).stdout, /already match/);
+  assert.match(cli().stdout, /no-zz {2}\(yours\)[\s\S]*last change .*\+no-zz/);
+  writeFileSync(src, JSON.stringify({ rules: [{ id: 'root-find', command: 'x', reason: 'r', instead: 'i' }, { id: 'bad', command: '(', reason: 'r', instead: 'i' }] }));
+  const refused = cli('apply', src);
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /root-find: that id belongs to a shipped rule; bad: command does not compile/);
+  assert.deepEqual(ids(), ['no-zz']);
+  assert.equal(hook(bash('echo x >> ~/.narvai/guard.log'), h)?.permissionDecision, 'deny');
 });
 
 test('git hook block: goes in front of a closing exit, so it runs', () => {

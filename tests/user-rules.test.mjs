@@ -1,13 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { denied } from '../hooks/guard.mjs';
 import { readJson } from '../cli/ortak.mjs';
 
-// The author's own rule file, when a path to it is given: NARVAI_USER_RULES=<guard.json> node --test
+// The author's own rules, when a path to their source is given: NARVAI_USER_RULES=<guard.rules.mjs or a .json> node --test
 const file = process.env.NARVAI_USER_RULES;
-test('user rules: app start, watch and Azure DevOps writes', { skip: !(file && existsSync(file)) && 'set NARVAI_USER_RULES to a guard.json' }, () => {
-  const list = readJson(file).rules;
+test('user rules: app start, watch, Azure DevOps writes and memory records', { skip: !(file && existsSync(file)) && 'set NARVAI_USER_RULES to a rule source' }, async () => {
+  const list = file.endsWith('.json') ? readJson(file).rules : (await import(pathToFileURL(file).href)).rules;
   const idFor = (command, tool = 'Bash') => denied({ tool, command, paths: [], cwd: '.' }, list)?.id;
   const blocked = {
     'dotnet run --project src/Api': 'app-run', 'dotnet.exe run': 'app-run', 'dotnet watch': 'app-run', 'npm run dev': 'app-run', 'pnpm dev': 'app-run',
@@ -31,4 +32,7 @@ test('user rules: app start, watch and Azure DevOps writes', { skip: !(file && e
   assert.equal(mcp('mcp__azure-devops__repo_pull_request_write', { action: 'create' }), undefined);
   assert.equal(mcp('mcp__azure-devops__pipelines_run', { action: 'list' }), undefined);
   assert.equal(mcp('mcp__azure-devops__wit_work_item', { action: 'get' }), undefined);
+  assert.equal(mcp('mcp__agentmemory__memory_save', { content: 'FACT x | topic: y | date: 2026-11-17', project: 'p' }), 'memory-by');
+  assert.equal(mcp('mcp__agentmemory__memory_save', { content: 'FACT x | topic: y | date: 2026-11-17 | by: claude-code/claude-opus-5-5/high', project: 'p' }), undefined);
+  assert.equal(mcp('mcp__agentmemory__memory_smart_search', { query: 'x' }), undefined);
 });

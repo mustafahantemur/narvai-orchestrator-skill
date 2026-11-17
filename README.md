@@ -65,6 +65,7 @@ narvai doctor [--fix]                        what is installed, what is broken, 
 narvai sync                                  regenerate rule files, links, agent profiles and the hook
 narvai eval [--only=a,b] [--rejudge=<dir>]   behaviour scenarios through headless Claude Code
 narvai allow <rule-id>                       a timed exception to a deny rule; only you can run it
+narvai guard [apply [<file>]]                list the deny rules, or put your own in force from their source
 ```
 
 `narvai` with no arguments lists every command. `KULLANIM.md` shows which one to use for a given job.
@@ -74,7 +75,8 @@ narvai allow <rule-id>                       a timed exception to a deny rule; o
 | File | Purpose |
 |---|---|
 | `~/.narvai/rules.md` | Your own rules. They come first when two rules disagree. |
-| `~/.narvai/guard.json` | Your deny rules, in the format of `hooks/deny.json`. The guard refuses an agent that touches this file. |
+| `~/.narvai/guard.rules.mjs` | The source of your deny rules: a module that exports `rules` (a `.json` file with `{ "rules": [...] }` works too). |
+| `~/.narvai/guard.json` | Your rules in force. `narvai guard apply` writes it from the source; the guard refuses a direct edit. |
 | `~/.narvai/config.json` | Store location, eval worktrees, the shared memory endpoint and its restart command. |
 | `<store>/<project>/project-rules.md` | Project rules. A first line `include: <path>` pulls in a file shared by several repositories. |
 | `<store>/<project>/verify.json` | Replaces the profile's checks for that repository. |
@@ -83,13 +85,14 @@ Order of precedence: your rules, the project's rule files, `rules/core.md`, then
 
 ## The guard
 
-`hooks/guard.mjs` refuses the commands the deny rules describe and tells the agent what to do instead. The shipped rules cover recursive searches from a filesystem root. Your own rules go in `~/.narvai/guard.json`.
+`hooks/guard.mjs` refuses the commands the deny rules describe and tells the agent what to do instead. The shipped rules cover recursive searches from a filesystem root. Your own rules live in `~/.narvai/guard.rules.mjs`; `narvai guard apply` validates them, keeps a backup, puts them in force and logs what changed in `~/.narvai/guard.log`. `narvai guard` lists every rule and the last change.
 
 The guard catches honest mistakes. It is not a sandbox, and a command written to avoid a pattern will pass.
 
 - A rule without `tool` applies to shell commands. A rule with `tool` applies to every tool whose name matches. `path` matches an edited file.
 - You lift a rule for a limited time with `narvai allow <rule-id>`. The command needs a terminal on its input, which an agent's shell does not have.
-- A rule marked `fixed` cannot be lifted. Both `narvai allow` and writes to the guard's own files are fixed rules.
+- A rule marked `fixed` cannot be lifted. Both `narvai allow` and direct writes to the guard's own files are fixed rules.
+- An agent can change your rules only through `narvai guard apply`, when you ask it to. The log and `narvai doctor` show who changed what, so a rule cannot disappear unseen.
 - A rule file that does not parse counts as empty, and a rule whose expression does not compile is skipped alone. `narvai doctor` reports both.
 
 ## Routes and skills
