@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, matchesGlob, relative, resolve } from 'node:path';
-import { appDir, git, HARNESS, harness, home, out, readJson, repoFiles, repoRoot, storeFor, which } from './ortak.mjs';
+import { appDir, git, HARNESS, harness, home, memory, out, readJson, repoFiles, repoRoot, storeFor, which } from './ortak.mjs';
 
 export const slash = (p) => p.replace(/\\/g, '/');
 const kb = (f) => `${(statSync(f).size / 1024).toFixed(1)} KB`;
@@ -157,14 +157,17 @@ export default async function run(args) {
   const stacks = stacksOf(files, profiles());
   const design = projectDesign(repo, store);
   const designLine = design?.path ? `design skill, read before UI work: ${design.name} ${slash(design.path)}` : null;
+  const memoryLine = (m) => (!m ? null : m.live ? `memory: reachable${m.restarted ? ' (it was down and has been restarted)' : ''}` : `memory: NOT reachable at ${m.url}${m.restarted ? `; a restart was tried (${m.start})` : ''}. Tell the user before you rely on it.`);
   // Session start gets a digest that cannot be mistaken for the rules: the agent still has to ask for them.
   if (hook) {
+    const mem = await memory();
     const { checks } = resolveChecks(repo, stacks, store);
     const work = workLines(workItems(store), branch).filter((l) => !l.startsWith('WARN on "continue"'));
     return out([
       `narvai session start: ${slash(repo)} @ ${branch}; stacks: ${stacks.map((p) => p.name).join(', ') || 'none'}; checks: ${checks.map((c) => c.name).join(', ') || 'none'}`,
       ...work,
       ...(designLine ? [designLine] : []),
+      ...(mem && !(mem.live && !mem.restarted) ? [mem.live ? memoryLine(mem) : 'memory: not reachable; a restart was triggered. `narvai context` waits for it and reports.'] : []),
       'This is a digest, not the rules. Before you change code here, run `narvai context`: it prints the project rules and the stack rules.',
     ]);
   }
@@ -192,6 +195,8 @@ export default async function run(args) {
   }
 
   if (designLine) lines.push(designLine);
+  const mem = memoryLine(await memory({ wait: 25000 }));
+  if (mem) lines.push(mem);
   if (store) {
     const pr = projectRules(store);
     lines.push(pr.head);

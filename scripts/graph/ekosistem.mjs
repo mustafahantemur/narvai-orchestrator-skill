@@ -1,13 +1,15 @@
 // Bir ekosistemin bütün repoları için iki graph'ı da model çağırmadan üretir:
 // Graphify (ajanların yapısal haritası, repo başına + birleşik) ve Understand-Anything (kök başına).
 // Repo listesi harness'ta değil store'da durur: <storeRoot>/graph/repos.json
-// Kullanım: node ekosistem.mjs [--only <repo>] [--head] [--merge] [--skip-graphify] [--skip-ua] [--no-fetch]
+// Kullanım: node ekosistem.mjs [--only <repo>] [--worktree|--head] [--merge] [--skip-graphify] [--skip-ua] [--no-fetch]
 // --merge: tek başına yalnız birleşik graph'ı kurar; --only ile birlikte o repodan sonra birleştirir.
-// --head: dalın origin ref'i yerine kaynak reponun o anki HEAD'i (git hook'ları bunu kullanır).
+// --head: dalın origin ref'i yerine kaynak reponun o anki HEAD'i.
+// --worktree: HEAD + commit'lenmemiş her şey (değişen, silinen ve izlenmeyen dosyalar); kaynak repoya hiçbir şey yazılmaz.
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { builtState, currentState } from '../../cli/graph.mjs';
 import { storeRoot } from '../../cli/ortak.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url)).replace(/\\/g, '/');
@@ -33,14 +35,30 @@ const seconds = (t) => Math.round((Date.now() - t) / 1000);
 function syncClone(repo) {
   const clone = `${GRAPH}/${repo.name}`;
   if (!fs.existsSync(`${clone}/.git`)) execFileSync('git', ['clone', '--quiet', '--shared', '--no-checkout', repo.path, clone]);
-  if (!flag('no-fetch') && !flag('head') && tryGit(repo.path, 'fetch', '--quiet', 'origin') === null) console.warn(`  uyarı: ${repo.name} origin'den çekilemedi, yerel ref kullanılıyor`);
+  const local = flag('head') || flag('worktree');
+  if (!flag('no-fetch') && !local && tryGit(repo.path, 'fetch', '--quiet', 'origin') === null) console.warn(`  uyarı: ${repo.name} origin'den çekilemedi, yerel ref kullanılıyor`);
   const branch = repo.branch || list.branch || 'development';
-  const ref = flag('head') ? 'HEAD' :
+  const ref = local ? 'HEAD' :
     [`refs/remotes/origin/${branch}`, 'refs/remotes/origin/HEAD', 'HEAD'].find((r) => tryGit(repo.path, 'rev-parse', '--verify', '--quiet', r) !== null);
   const commit = git(repo.path, 'rev-parse', ref);
+  // Önceki kurulumun kopyaladığı izlenmeyen dosyalar önce gider; artık izlenen varsa checkout geri getirir.
+  for (const f of builtState(repo.name)?.overlay ?? []) fs.rmSync(`${clone}/${f}`, { force: true });
   git(clone, 'fetch', '--quiet', repo.path, commit);
-  git(clone, 'checkout', '--quiet', '--detach', commit);
-  return { clone, commit, ref };
+  git(clone, 'checkout', '--quiet', '--force', '--detach', commit);
+  if (!flag('worktree')) return { clone, commit, state: commit, overlay: [] };
+
+  const names = (...a) => (tryGit(repo.path, '-c', 'core.quotepath=false', ...a) ?? '').split('\n').filter(Boolean);
+  const overlay = names('ls-files', '--others', '--exclude-standard');
+  for (const f of names('diff', 'HEAD', '--name-only', '--diff-filter=D')) fs.rmSync(`${clone}/${f}`, { force: true });
+  for (const f of [...names('diff', 'HEAD', '--name-only', '--diff-filter=d'), ...overlay]) {
+    try {
+      fs.mkdirSync(path.dirname(`${clone}/${f}`), { recursive: true });
+      fs.copyFileSync(`${repo.path}/${f}`, `${clone}/${f}`);
+    } catch {
+      // kurulum sırasında silinen ya da taşınan dosya: sonraki tur yakalar
+    }
+  }
+  return { clone, commit, state: currentState(repo.path), overlay };
 }
 
 function expandRoots(repo, clone) {
@@ -61,9 +79,9 @@ for (const repo of flag('merge') && !only ? [] : list.repos.filter((r) => !only 
   const row = { repo: repo.name, ua: [], errors: [] };
   results.push(row);
   console.log(`\n== ${repo.name}`);
-  let clone;
+  let clone, state, overlay;
   try {
-    ({ clone, commit: row.commit } = syncClone(repo));
+    ({ clone, commit: row.commit, state, overlay } = syncClone(repo));
   } catch (e) {
     row.errors.push(`kopya: ${e.message.split('\n')[0]}`);
     continue;
@@ -98,6 +116,8 @@ for (const repo of flag('merge') && !only ? [] : list.repos.filter((r) => !only 
   }
   row.seconds = seconds(started);
   for (const e of row.errors) console.log(`  HATA ${e}`);
+  // İki graph da hatasız kurulduysa repo bu duruma göre günceldir; narvai graph status bununla karşılaştırır.
+  if (!row.errors.length && !flag('skip-graphify') && !flag('skip-ua')) writeJson(`${GRAPH}/${repo.name}.state.json`, { state, head: row.commit, builtAt: new Date().toISOString(), overlay });
 }
 
 const indexPath = `${GRAPH}/index.json`;

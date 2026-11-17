@@ -2,7 +2,7 @@ import { execFileSync, execSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { cfg, cfgPath, HARNESS, home, readJson, sameDir, skillTargets, tilde, which } from './ortak.mjs';
+import { cfg, cfgPath, HARNESS, home, memory, readJson, sameDir, skillTargets, tilde, which } from './ortak.mjs';
 import { rules as guardRules } from '../hooks/guard.mjs';
 import { graphRows } from './graph.mjs';
 import runSync from './sync.mjs';
@@ -372,10 +372,7 @@ function versions() {
 function graphs() {
   let rows;
   try { rows = graphRows(); } catch { return []; }
-  return rows.filter((r) => r.commits.length).map((r) => {
-    const stale = r.states.find((s) => !s.startsWith('current'));
-    return stale ? warn(`graph ${r.repo}: ${stale}  (narvai graph build --only ${r.repo})`) : ok(`graph ${r.repo}: ${r.states[0]}`);
-  });
+  return rows.filter((r) => r.built).map((r) => (r.stale ? warn(`graph ${r.repo}: ${r.state}  (narvai graph build --only ${r.repo} --worktree)`) : ok(`graph ${r.repo}: ${r.state}`)));
 }
 
 function pipeline(idx) {
@@ -386,19 +383,22 @@ function pipeline(idx) {
   ];
 }
 
-function collect() {
+async function collect() {
   const idx = indexOf(skillInventory());
-  return pipeline(idx).flatMap(([name, fn]) => {
+  const rows = pipeline(idx).flatMap(([name, fn]) => {
     try { return fn(); } catch (e) { return [warn(`check ${name} failed: ${String(e.message).split('\n')[0]}`)]; }
   });
+  const m = await memory();
+  if (m) rows.push(m.live ? ok(`shared memory reachable${m.restarted ? ' (it was down; restarted now)' : ''}`) : fail(`shared memory not reachable at ${m.url}${m.restarted ? `  (restart tried: ${m.start})` : ''}`));
+  return rows;
 }
 
 export default async function run(args = []) {
-  let rows = collect();
+  let rows = await collect();
   if (args.includes('--fix') && rows.some((r) => r.fix && r.level !== 'OK')) {
     console.log('narvai doctor --fix: running sync');
     await runSync([]);
-    rows = collect();
+    rows = await collect();
   }
   console.log('narvai doctor');
   for (const r of rows) console.log(`  ${r.level.padEnd(4)} ${r.text}`);

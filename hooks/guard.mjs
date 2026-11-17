@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, resolve } from 'node:path';
@@ -85,7 +85,11 @@ function main() {
   const reply = (o) => process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: n.event, ...o } }));
   if (n.event === 'SessionStart') {
     const text = sessionContext(n);
-    if (text) reply({ additionalContext: text });
+    if (text) {
+      reply({ additionalContext: text });
+      // Graphs follow the working tree: a stale one is rebuilt in the background, detached from this session.
+      spawn(process.execPath, [cli(), 'graph', 'refresh'], { cwd: n.cwd, detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    }
   } else if (n.event === 'PreToolUse') {
     const r = denied(n, rules(), exceptions());
     if (r) return reply({ permissionDecision: 'deny', permissionDecisionReason: `${r.reason} Instead: ${r.instead}${r.fixed ? '' : ` Only the user can grant an exception, in their own terminal: narvai allow ${r.id}`}` });
