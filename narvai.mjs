@@ -10,7 +10,7 @@ const COMMANDS = {
   tests: '[--base <ref>] [--failed <file>...]  changed sources whose tests were not touched; which side of a red test changed last',
   contract: '[--base <ref>]  contract steps when a contract path changed',
   skill: '<name> | --list [--stack s]  path and description of a skill',
-  graph: '<build|status|refresh> [--only repo] [--worktree|--head] [--merge]  build or check the code graphs',
+  graph: '<build|status|refresh|memory> [--only repo] [--worktree|--head] [--merge] [--reset] [--migrate]  build or check the code graphs and the knowledge graph of the shared memory',
   allow: '<rule-id> [--minutes n]  temporary exception to a guard rule; needs a terminal, so only a person runs it',
   guard: '[apply [<file>]]  list the guard rules, or put your own rules in force from their source (logged)',
   doctor: '[--fix]  installation, rules, routes, guard, memory and graph checks',

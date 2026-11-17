@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, matchesGlob, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -81,6 +81,16 @@ export function backup(file) {
   const dir = join(home(), '.narvai', 'backups');
   mkdirSync(dir, { recursive: true });
   copyFileSync(file, join(dir, `${file.split(/[\\/]/).slice(-2).join('_')}.${Date.now()}`));
+}
+
+// One holder at a time: false while another live process holds the file. A lock older than two hours is a crashed run,
+// whatever process now owns that pid. The holder removes the file when it is done.
+export function lock(file) {
+  let holder = 0;
+  try { if (Date.now() - statSync(file).mtimeMs < 2 * 3600_000) holder = Number(readFileSync(file, 'utf8')); } catch {}
+  if (holder) { try { process.kill(holder, 0); return false; } catch {} }
+  rmSync(file, { force: true });
+  try { writeFileSync(file, String(process.pid), { flag: 'wx' }); return true; } catch { return false; }
 }
 
 // A temp NARVAI_HOME wins over the real user's app-data variables.

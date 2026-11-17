@@ -121,6 +121,7 @@ export default async function run(argv) {
       if (!live()) throw new Error('not live after 120 s; see ~/.agentmemory/server.log');
       return 'started';
     });
+    step('knowledge graph of the shared memory', () => sh(process.execPath, [join(HARNESS, 'narvai.mjs'), 'graph', 'memory', '--migrate']).trim().replace(/^memory graph: /, '') || false);
     const mcpEnv = { AGENTMEMORY_URL, AGENTMEMORY_FORCE_PROXY: '1' };
     if (which('claude')) step('Claude Code MCP agentmemory', () => {
       if (sh('claude', ['mcp', 'get', 'agentmemory'], { allowFail: true, readOnly: true }).status === 0) return 'exists';

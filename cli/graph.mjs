@@ -1,9 +1,10 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { rmSync, statSync } from 'node:fs';
 import { constants, setPriority } from 'node:os';
 import { dirname, join } from 'node:path';
-import { cfg, git, HARNESS, readJson, storeRoot } from './ortak.mjs';
+import { memoryGraph } from './memory-graph.mjs';
+import { cfg, git, HARNESS, lock, readJson, storeRoot } from './ortak.mjs';
 
 const graphDir = () => join(storeRoot(), 'graph');
 const short = (s) => (s ? s.replace(/^([0-9a-f]{8})[0-9a-f]*/, '$1') : '-');
@@ -57,7 +58,7 @@ function legacyState(index, repo) {
   return commits.length === 1 ? { state: commits[0], head: commits[0], builtAt: '' } : commits.length ? { state: 'mixed', head: '', builtAt: '' } : null;
 }
 
-function status(args) {
+async function status(args) {
   const only = args[args.indexOf('--only') + 1];
   const rows = graphRows().filter((r) => !args.includes('--only') || r.repo === only);
   const lines = [`narvai graph status: ${graphDir()}`];
@@ -66,10 +67,10 @@ function status(args) {
   const newer = (index.graphify ?? []).filter((g) => g.builtAt > (index.ecosystem?.builtAt ?? '')).length;
   if (index.ecosystem) lines.push(`  ${'(all repos merged)'.padEnd(28)} ${''.padEnd(21)} ${newer ? `stale: ${newer} repo graph(s) are newer; narvai graph build --merge` : 'current'}`);
   if (lines.length > 20) lines.splice(19, Infinity, `  ... ${lines.length - 19} more repos`);
+  const memory = await memoryGraph({ check: true });
+  if (memory) lines.push(`  ${memory}`);
   console.log(lines.join('\n'));
 }
-
-const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 
 function build(args) {
   const script = join(HARNESS, 'scripts', 'graph', 'ekosistem.mjs');
@@ -81,13 +82,8 @@ function build(args) {
   const dir = graphDir();
   const repo = readJson(join(dir, 'repos.json'), { repos: [] }).repos.find((r) => r.name === only);
   if (!repo) throw new Error(`${only} is not in ${join(dir, 'repos.json')}`);
-  const lock = join(dir, `${only}.lock`);
-  // A lock older than two hours is a crashed build, whatever process now owns that pid.
-  let holder = 0;
-  try { if (Date.now() - statSync(lock).mtimeMs < 2 * 3600_000) holder = Number(readFileSync(lock, 'utf8')); } catch {}
-  if (holder && alive(holder)) { console.log(`graph build for ${only} already running (pid ${holder})`); return; }
-  rmSync(lock, { force: true });
-  try { writeFileSync(lock, String(process.pid), { flag: 'wx' }); } catch { console.log(`graph build for ${only} already running`); return; }
+  const held = join(dir, `${only}.lock`);
+  if (!lock(held)) { console.log(`graph build for ${only} already running`); return; }
   try {
     setPriority(constants.priority.PRIORITY_BELOW_NORMAL);
     // Changes that land while a build runs are picked up by the next pass; at most 3 passes.
@@ -97,12 +93,12 @@ function build(args) {
       if (built?.state === want) { console.log(`graph for ${only} is current: ${short(want)}`); return; }
       if (runScript() !== 0) { process.exitCode = 1; return; }
     }
-  } finally { rmSync(lock, { force: true }); }
+  } finally { rmSync(held, { force: true }); }
 }
 
 // Called in the background at session start: rebuild this repository's graphs from the working tree when they are stale,
 // but not more often than every graphMinutes (default 30), so a busy day does not rebuild on every session.
-function refresh(args) {
+function refreshCode(args) {
   const list = readJson(join(graphDir(), 'repos.json'), { repos: [] });
   const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : graphRepoFor(process.cwd(), list);
   const repo = list.repos.find((r) => r.name === only);
@@ -114,10 +110,25 @@ function refresh(args) {
   build(['--only', only, '--worktree', '--no-fetch']);
 }
 
+// What the hook starts in the background at session start: the knowledge graph of the shared memory, then this
+// repository's code graphs.
+async function refresh(args) {
+  const line = await memoryGraph();
+  if (line) console.log(line);
+  refreshCode(args);
+}
+
+async function memory(args) {
+  const wait = args.includes('--wait') ? Number(args[args.indexOf('--wait') + 1]) || 0 : 0;
+  console.log(await memoryGraph({ reset: args.includes('--reset'), migrate: args.includes('--migrate'), wait })
+    ?? 'memory graph: the config names no shared memory (memory.url); narvai setup writes it');
+}
+
 export default async function run(args) {
   const [sub, ...rest] = args;
   if (sub === 'status') return status(rest);
   if (sub === 'build') return build(rest);
   if (sub === 'refresh') return refresh(rest);
-  throw new Error('usage: narvai graph <build|status|refresh> [--only repo] [--worktree|--head] [--merge] [--now]');
+  if (sub === 'memory') return memory(rest);
+  throw new Error('usage: narvai graph <build|status|refresh|memory> [--only repo] [--worktree|--head] [--merge] [--now] [--reset] [--migrate]');
 }
