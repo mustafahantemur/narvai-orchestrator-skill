@@ -270,7 +270,7 @@ Kurulumun tamamı bu repodan ve içindeki komutlardan gelir. Repoda olmayan üç
 | Ortak hafızanın verisi | `<kök>/Memory/agentmemory` | Hafıza boş başlar |
 
 1. Node 22, git ve kullandığın ajanları kur: Claude Code, Codex.
-2. Ortak hafıza için `npm install -g @agentmemory/agentmemory@0.9.33`. Kod graph'ları için `uv tool install graphifyy` ve `~/.understand-anything-plugin` altında Understand-Anything plugin'inin bir kopyası.
+2. Ortak hafıza için `npm install -g @agentmemory/agentmemory@0.9.33`. Kod graph'ları için `uv tool install graphifyy` ve `~/.understand-anything-plugin` altında Understand-Anything plugin'inin bir kopyası. Plugin yoksa `install` klonlama komutunu yazar; PATH'te olmayan aracı `narvai doctor` bildirir.
 3. Repoyu klonla ve `node narvai.mjs setup --root <kök>` çalıştır. setup önce `install` yapar, sonra bulduğunu ayarlar: AgentMemory'nin ayarları, Windows'ta yeniden başlatma görevi, her ajandaki MCP kaydı ve graph index'i; ardından Hermes, Codex ve Orca. Sonunda elle yapılacakları listeler.
 4. Yasak kuralı getirdiysen `narvai guard apply`, sonra `narvai doctor`.
 5. Codex'te `/hooks` aç ve narvai girdilerine güven ver.

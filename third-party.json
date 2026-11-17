@@ -359,7 +359,9 @@
       "pnpm",
       "csharp-ls",
       "typescript-language-server",
-      "lefthook"
+      "lefthook",
+      "agentmemory",
+      "graphify"
     ],
     "heavy": [
       "semgrep",
