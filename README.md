@@ -4,6 +4,8 @@ narvai sits between a coding agent (Claude Code or Codex) and your repositories.
 
 Stack profiles exist for .NET and Next.js. Another stack is one folder.
 
+`KULLANIM.md` is the usage guide, in Turkish: one section per job (adding a repository, changing a rule, lifting a deny rule, building graphs, checking the shared memory, troubleshooting) with the command for each.
+
 ## How a session goes
 
 1. A hook prints a three-line digest at session start: the repository, its stacks and checks, any open work item.
@@ -65,7 +67,7 @@ narvai eval [--only=a,b] [--rejudge=<dir>]   behaviour scenarios through headles
 narvai allow <rule-id>                       a timed exception to a deny rule; only you can run it
 ```
 
-`narvai` with no arguments lists every command.
+`narvai` with no arguments lists every command. `KULLANIM.md` shows which one to use for a given job.
 
 ## Files that are yours
 
