@@ -62,7 +62,7 @@ The whole setup comes from this repository and the commands in it. Three things 
 | Shared memory data | `<root>/Memory/agentmemory` | The memory starts empty. |
 
 1. Install Node 22, git and the agents you use, Claude Code and Codex.
-2. Install the shared memory with `npm install -g @agentmemory/agentmemory@0.9.33`. Code graphs need `uv tool install graphifyy` and a copy of the Understand-Anything plugin in `~/.understand-anything-plugin`.
+2. Install the shared memory with `npm install -g @agentmemory/agentmemory@0.9.33`. Code graphs need `uv tool install graphifyy` and a copy of the Understand-Anything plugin in `~/.understand-anything-plugin`. `install` prints the clone command for the plugin when it is missing, and `narvai doctor` reports a tool that is not on PATH.
 3. Clone this repository and run `node narvai.mjs setup --root <root>`. setup runs `install`, then configures what it finds: AgentMemory with its settings, its restart task on Windows, its MCP entry in each agent and its graph index, then Hermes, Codex and Orca. It ends with a list of what is left to do by hand.
 4. Run `narvai guard apply` if you brought deny rules, then `narvai doctor`.
 5. In Codex, open `/hooks` and trust the narvai entries.
