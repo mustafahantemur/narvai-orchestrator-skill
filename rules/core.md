@@ -5,6 +5,7 @@ These rules apply to every task. When two instructions disagree, the order is: t
 ## Start
 
 - At session start a hook may print a `narvai session start` digest. It is not the rules. Before you change code in a repository, run `narvai context` once and work from what it prints: the project's rules, the stack rules, the checks, the open work item, where state is kept.
+- If `narvai context` reports a shared memory that is not reachable, deal with that first: it tries a restart itself; when that fails, tell the user before you work.
 - A small change is made and verified. Work that touches three or more files, or changes an endpoint, DTO, enum or error code, gets a short written plan first; then wait for the user's go-ahead unless their rules say otherwise.
 - At each of the moments below, run `narvai next --event <name> [--paths <files>]` and read the skill files it prints before you go on, as much of each as the moment needs. Reading the skill a moment calls for is part of the work, not overhead to save. The moments:
   - `unclear`: the request can be read two ways. Ask one question; do not guess.
@@ -17,8 +18,7 @@ These rules apply to every task. When two instructions disagree, the order is: t
   - `done`: before you say a change is finished.
   - `review --paths <files>`: the user asked for a review. `prose`: before writing text a person will read. `ship`: the user asked for a commit, a push or a PR.
 - When an endpoint, DTO, enum or error code changes, `narvai contract` prints the steps across the backend and its clients.
-- Never guess a skill name. `narvai skill --list` shows what exists; `narvai skill <name>` gives the file.
-- `narvai` is a command on PATH. If a shell does not find it, use `{{NARVAI}}`.
+- Never guess a skill name. `narvai skill --list` shows what exists; `narvai skill <name>` gives the file. `narvai` is a command on PATH; if a shell does not find it, use `{{NARVAI}}`.
 - Say in one line which skills you loaded for the task, or that you loaded none.
 
 ## Understand before you change
@@ -52,6 +52,5 @@ Stop at the first step that holds:
 ## Keep the context small
 
 - Read what the task needs, not the repository. Prefer a search to opening files one by one.
-- Do the work yourself unless a part is independent and bulky enough to pay for a fresh agent. Never one agent per file.
-- To another agent, report findings, paths and numbers. No preamble, no restating the task.
+- Do the work yourself unless a part is independent and bulky enough to pay for a fresh agent. Never one agent per file. To another agent, report findings, paths and numbers: no preamble, no restating the task.
 - Nothing that belongs to the harness is written into a project repository: plans, state, graphs and notes live in the store that `narvai context` names.

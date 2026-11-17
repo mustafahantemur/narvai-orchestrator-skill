@@ -1,6 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { git, HARNESS, readJson, storeRoot } from './ortak.mjs';
+import { join } from 'node:path';
+import { git, HARNESS } from './ortak.mjs';
 
 const BEGIN = (hook) => `# >>> narvai ${hook}`;
 const END = (hook) => `# <<< narvai ${hook}`;
@@ -27,18 +27,18 @@ export function withBlock(text, hook, body) {
 }
 
 // Each block keeps the exit status the hook had before it, and does nothing when the harness is gone.
-export function blocks(cli, graphRepo) {
+// The post-* hooks carried a graph rebuild until graphs followed the working tree; null removes those blocks.
+export function blocks(cli) {
   const node = `node "${cli}"`;
   const here = (cmd) => `if [ -f "${cli}" ]; then ${cmd}; fi`;
-  const refresh = `(${node} graph build --only "${graphRepo}" --head >/dev/null 2>&1 &)`;
   const keep = (cmd) => ['narvai_rc=$?', here(cmd), '(exit "$narvai_rc")'].join('\n');
   return {
     'pre-push': ['narvai_rc=$?; [ "$narvai_rc" -eq 0 ] || exit "$narvai_rc"',
       here(`${node} verify --changed || { echo "narvai verify failed. Fix it, or push with --no-verify if you accept the risk."; exit 1; }`)].join('\n'),
     'pre-commit': keep(`${node} tests >&2 || true`),
-    'post-commit': graphRepo ? keep(refresh) : null,
-    'post-merge': graphRepo ? keep(refresh) : null,
-    'post-checkout': graphRepo ? keep(`[ "$3" = 1 ] && ${refresh}`) : null,
+    'post-commit': null,
+    'post-merge': null,
+    'post-checkout': null,
   };
 }
 
@@ -50,23 +50,14 @@ function undoOldPrePush(dir) {
   else rmSync(hook);
 }
 
-function graphRepoFor(repo) {
-  const main = dirname(git(['rev-parse', '--path-format=absolute', '--git-common-dir'], repo));
-  const norm = (p) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-  let list;
-  try { list = readJson(join(storeRoot(), 'graph', 'repos.json'), { repos: [] }); } catch { return null; }
-  const name = list.repos?.find((r) => norm(r.path) === norm(main))?.name;
-  return name && /^[\w.-]+$/.test(name) ? name : null;
-}
-
-export function installHooks(repo, { cli = join(HARNESS, 'narvai.mjs').replace(/\\/g, '/'), remove = false, graphRepo = graphRepoFor(repo) } = {}) {
+export function installHooks(repo, { cli = join(HARNESS, 'narvai.mjs').replace(/\\/g, '/'), remove = false } = {}) {
   const dir = git(['rev-parse', '--path-format=absolute', '--git-path', 'hooks'], repo);
   // core.hooksPath can point at a folder the repository tracks; nothing of narvai goes into a repository.
   if (!remove && git(['ls-files', '--', dir], repo)) return [`narvai hooks: ${dir} is tracked by the repository; nothing written. Add the narvai lines to your own hook by hand if you want them.`];
   mkdirSync(dir, { recursive: true });
   undoOldPrePush(dir);
-  const lines = [`narvai hooks: ${dir}${graphRepo ? `  (graph refresh for ${graphRepo})` : ''}`];
-  for (const [hook, body] of Object.entries(blocks(cli, graphRepo))) {
+  const lines = [`narvai hooks: ${dir}`];
+  for (const [hook, body] of Object.entries(blocks(cli))) {
     const file = join(dir, hook);
     const before = existsSync(file) ? readFileSync(file, 'utf8') : '';
     const has = before.includes(BEGIN(hook));

@@ -10,7 +10,7 @@ const COMMANDS = {
   tests: '[--base <ref>] [--failed <file>...]  changed sources whose tests were not touched; which side of a red test changed last',
   contract: '[--base <ref>]  contract steps when a contract path changed',
   skill: '<name> | --list [--stack s]  path and description of a skill',
-  graph: '<build|status> [--only repo] [--head] [--merge]  build or check the code graphs',
+  graph: '<build|status|refresh> [--only repo] [--worktree|--head] [--merge]  build or check the code graphs',
   allow: '<rule-id> [--minutes n]  temporary exception to a guard rule',
   doctor: ' installation and content checks',
   eval: '[--only=id,id] [--dry-run]  evals/scenarios.json through headless Claude (costs tokens)',
@@ -19,7 +19,7 @@ const COMMANDS = {
   setup: '[--root <dir>] [--claude-subscription] [--dry-run]  install --adopt, then Hermes, AgentMemory, MCP, Codex, Orca',
   usage: '[--days N]  which skills are actually used',
   estimate: '<path|file>... [--diff[=ref]]  token estimate of what a worker would read',
-  hooks: '[<repo>] [--remove]  git hooks: verify before push, stale-test note at commit, graph refresh',
+  hooks: '[<repo>] [--remove]  git hooks: verify before push, stale-test note at commit',
 };
 
 const [cmd, ...args] = process.argv.slice(2);

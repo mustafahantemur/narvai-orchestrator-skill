@@ -104,47 +104,45 @@ function tempRepo() {
   return { t, repo, g, stub, hooks: join(t, 'myhooks') };
 }
 
-test('installer: core.hooksPath, appends to user hooks, keeps their exit status, detaches the graph build, removes cleanly', async () => {
-  const { t, repo, g, stub, hooks } = tempRepo();
+test('installer: core.hooksPath, appends to user hooks, keeps their exit status, takes old graph blocks out, removes cleanly', () => {
+  const { repo, g, stub, hooks } = tempRepo();
   mkdirSync(hooks);
   const userPreCommit = '#!/bin/sh\necho user-pre-commit\ntest ! -f block-me\n';
   writeFileSync(join(hooks, 'pre-commit'), userPreCommit);
+  const lfs = '#!/bin/sh\necho lfs\n';
+  writeFileSync(join(hooks, 'post-commit'), `${lfs}# >>> narvai post-commit\necho old-graph-build\n# <<< narvai post-commit\n`);
 
-  const first = installHooks(repo, { cli: stub, graphRepo: 'demo' });
+  const first = installHooks(repo, { cli: stub });
   assert.match(first[0], /myhooks/);
-  assert.deepEqual(first.slice(1).map((l) => l.trim().replace(/\s+/g, ' ')), ['installed pre-push', 'installed pre-commit', 'installed post-commit', 'installed post-merge', 'installed post-checkout']);
+  assert.deepEqual(first.slice(1).map((l) => l.trim().replace(/\s+/g, ' ')), ['installed pre-push', 'installed pre-commit', 'removed post-commit']);
   assert.ok(readFileSync(join(hooks, 'pre-commit'), 'utf8').startsWith(userPreCommit));
-  assert.ok(installHooks(repo, { cli: stub, graphRepo: 'demo' }).slice(1).every((l) => l.includes('unchanged')));
+  assert.equal(readFileSync(join(hooks, 'post-commit'), 'utf8'), lfs);
+  assert.ok(installHooks(repo, { cli: stub }).slice(1).every((l) => l.includes('unchanged')));
 
   writeFileSync(join(repo, 'a.txt'), 'a');
   g('add', 'a.txt');
-  const t0 = Date.now();
   const commit = spawnSync('git', ['commit', '-q', '-m', 'a'], { cwd: repo, encoding: 'utf8' });
-  const took = Date.now() - t0;
   assert.equal(commit.status, 0, commit.stderr);
   assert.match(commit.stdout + commit.stderr, /user-pre-commit[\s\S]*STUB tests output/);
-  assert.ok(took < 2500, `commit took ${took} ms; the graph build must not block it`);
-  assert.ok(!existsSync(join(t, 'built.json')));
-  for (let i = 0; i < 40 && !existsSync(join(t, 'built.json')); i++) await new Promise((r) => setTimeout(r, 250));
-  assert.deepEqual(JSON.parse(readFileSync(join(t, 'built.json'), 'utf8')), ['graph', 'build', '--only', 'demo', '--head']);
+  assert.doesNotMatch(commit.stdout + commit.stderr, /old-graph-build/);
 
   writeFileSync(join(repo, 'block-me'), '');
   g('add', 'block-me');
   assert.notEqual(spawnSync('git', ['commit', '-q', '-m', 'b'], { cwd: repo }).status, 0, 'a failing user hook still blocks the commit');
 
-  const removed = installHooks(repo, { cli: stub, graphRepo: 'demo', remove: true });
-  assert.equal(removed.length, 6);
+  const removed = installHooks(repo, { cli: stub, remove: true });
+  assert.equal(removed.length, 3);
   assert.equal(readFileSync(join(hooks, 'pre-commit'), 'utf8'), userPreCommit);
-  for (const h of ['pre-push', 'post-commit', 'post-merge', 'post-checkout']) assert.ok(!existsSync(join(hooks, h)), h);
+  assert.ok(!existsSync(join(hooks, 'pre-push')));
 });
 
-test('installer: no graph repo means no graph hooks, and an old whole-file pre-push is undone', () => {
+test('installer: an old whole-file pre-push is undone', () => {
   const { repo, g, stub } = tempRepo();
   g('config', '--unset', 'core.hooksPath');
   const dir = join(repo, '.git', 'hooks');
   writeFileSync(join(dir, 'pre-push'), '#!/bin/sh\n# narvai pre-push\nnode x verify --hook\n');
   writeFileSync(join(dir, 'pre-push.local'), '#!/bin/sh\ngit lfs pre-push "$@"\n');
-  const lines = installHooks(repo, { cli: stub, graphRepo: null });
+  const lines = installHooks(repo, { cli: stub });
   assert.deepEqual(lines.slice(1).map((l) => l.trim().split(/\s+/)[1]), ['pre-push', 'pre-commit']);
   assert.ok(!existsSync(join(dir, 'pre-push.local')));
   const prePush = readFileSync(join(dir, 'pre-push'), 'utf8');

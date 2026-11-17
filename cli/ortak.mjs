@@ -93,6 +93,21 @@ export const skillTargets = () => [join(home(), '.claude', 'skills'), join(home(
   .filter((d) => existsSync(dirname(d)));
 export const sameDir = (a, b) => { try { return realpathSync(a) === realpathSync(b); } catch { return false; } };
 
+// The shared memory the user's rules rely on. Reachable, or restarted with the command the config names and waited for.
+export async function memory({ wait = 0 } = {}) {
+  const m = cfg().memory;
+  if (!m?.url) return null;
+  const live = async () => { try { return (await fetch(m.url, { signal: AbortSignal.timeout(1500) })).ok; } catch { return false; } };
+  if (await live()) return { url: m.url, live: true };
+  if (!m.start) return { url: m.url, live: false };
+  try { execFileSync(m.start, { shell: true, stdio: 'ignore', timeout: 8000 }); } catch {}
+  for (const end = Date.now() + wait; Date.now() < end;) {
+    if (await live()) return { url: m.url, live: true, restarted: true };
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  return { url: m.url, live: await live(), restarted: true, start: m.start };
+}
+
 export async function optional(rel, name) {
   const p = join(HARNESS, rel);
   return existsSync(p) ? (await import(pathToFileURL(p).href))[name] : undefined;
