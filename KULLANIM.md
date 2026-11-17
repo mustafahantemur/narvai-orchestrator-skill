@@ -69,20 +69,28 @@ Hook bir komutu reddederse ajana nedenini ve yerine ne yapacağını söyler. Aj
 | İş | Nasıl |
 |---|---|
 | Bir yasağı geçici kaldırmak | Kendi terminalinde `narvai allow <kural-id> --minutes 60` (varsayılan 30, en fazla 480) |
-| Kendi yasağını eklemek ya da silmek | `~/.narvai/guard.json` dosyasını kendin düzenle |
+| Kendi yasağını eklemek, değiştirmek ya da silmek | `~/.narvai/guard.rules.mjs` dosyasını düzenle, sonra `narvai guard apply` |
+| Yürürlükteki kuralları ve son değişikliği görmek | `narvai guard` |
 | Kuralların derlendiğini görmek | `narvai doctor` ("guard rules compile") |
 
-`narvai allow` terminal ister; bu yüzden ajanın kabuğundan çalışmaz. Ajan `~/.narvai/guard.json` ve `~/.narvai/allow.json` dosyalarına da dokunamaz.
+`narvai allow` terminal ister; bu yüzden ajanın kabuğundan çalışmaz. Ajan `~/.narvai/guard.json`, `~/.narvai/allow.json` ve `~/.narvai/guard.log` dosyalarına doğrudan dokunamaz.
 
-Bir kural şöyle görünür. `command` bir regular expression; `tool` verilmezse kural kabuk komutlarına uygulanır:
+Kuralları ajana da değiştirtebilirsin: ajan kaynağı düzenler ve `narvai guard apply` çalıştırır. Komut kuralları denetler, eski dosyayı yedekler ve değişikliği kaydeder. `narvai guard` ve `narvai doctor` son değişikliği kimin yaptığıyla birlikte gösterir:
 
-```json
-{ "rules": [
-  { "id": "app-run",
-    "command": "(?:^|[;&|(]\\s*)dotnet\\s+(?:run|watch)(?=\\s|$)",
-    "reason": "The user starts the app from the IDE.",
-    "instead": "test against what is already listening." }
-] }
+```
+last change 2026-11-17 by claude: +memory-by -compose-up
+```
+
+Bir kural şöyle görünür. `command` bir regular expression; `tool` verilmezse kural kabuk komutlarına uygulanır. `String.raw` sayesinde ters eğik çizgileri ikilemen gerekmez:
+
+```js
+const r = String.raw;
+export const rules = [
+  { id: 'app-run',
+    command: r`(?:^|[;&|(]\s*)dotnet\s+(?:run|watch)(?=\s|$)`,
+    reason: 'The user starts the app from the IDE.',
+    instead: 'test against what is already listening.' },
+];
 ```
 
 Hazır gelen kurallar (`hooks/deny.json`): dosya sistemi kökünden arama (`root-find`, `root-list`, `root-ls`, `root-grep`, `root-cd`) ve kaldırılamayan üç kural (`narvai-allow`, `guard-files-shell`, `guard-files-edit`). `hooks/deny.json` elle düzenlenmez; `hooks/build-deny.mjs` dosyasını değiştirip `node hooks/build-deny.mjs` çalıştır.
@@ -149,6 +157,18 @@ Sayfa o klasörün `graphify-out/graph.html` dosyasıdır. Bütün bir büyük r
 
 Windows'ta zamanlanmış görev oturum açılışında ve her 15 dakikada bir çalışır; sunucu ayaktaysa dokunmaz, kapalıysa yeniden başlatır. Sunucunun günlüğü `~/.agentmemory/compose-3111.log` dosyasıdır.
 
+Bir kaydı kimin yazdığını görmek için kayıt biçimine bir `by` alanı ekleyebilirsin: `| by: <harness>/<model>/<efor>`, örneğin `| by: claude-code/claude-opus-5-5/high`. Bunu zorunlu kılan kural senin yasak kurallarına yazılır; `by` taşımayan kaydı hook reddeder:
+
+```js
+{ id: 'memory-by',
+  tool: r`^mcp__agentmemory__memory_save$`,
+  command: r`^(?![\s\S]*\|\s*by:\s*[\w.-]+/[\w.:-]+)`,
+  reason: 'A shared memory record says who wrote it.',
+  instead: 'end the record with `| by: <harness>/<model>`.' },
+```
+
+Alanı ajan kendisi yazar; hook yalnız var olup olmadığına bakar, doğruluğunu denetlemez.
+
 ## Sağlık kontrolü ve sorun giderme
 
 `narvai doctor` kurulumu, kural dosyalarının boyutunu, rotaları, guard kurallarını, hafızayı ve graph'ları denetler. `narvai doctor --fix`, `sync` ile düzelebilenleri düzeltir.
@@ -206,7 +226,8 @@ Bu repoda değişiklik yaptıysan önce `node --test tests/*.test.mjs` koştur. 
 | Dosya | Yer |
 |---|---|
 | Ayarlar | `~/.narvai/config.json` |
-| Kişisel kurallar, yasaklar | `~/.narvai/rules.md`, `~/.narvai/guard.json` |
+| Kişisel kurallar | `~/.narvai/rules.md` |
+| Yasakların kaynağı, yürürlükteki hali, değişiklik kaydı | `~/.narvai/guard.rules.mjs`, `~/.narvai/guard.json`, `~/.narvai/guard.log` |
 | Geçici istisnalar | `~/.narvai/allow.json` |
 | Yedekler (sync'in değiştirdiği her dosya) | `~/.narvai/backups/` |
 | Repo ile store eşlemesi | `<store>/map.json` |
