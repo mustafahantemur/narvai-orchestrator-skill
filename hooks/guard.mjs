@@ -9,7 +9,10 @@ import { pathHit } from '../cli/next.mjs';
 
 const SHELL = /^(?:Bash|PowerShell)$/;
 const EDIT = /^(?:Edit|Write|MultiEdit|NotebookEdit|apply_patch)$/;
+const SAVE = /agentmemory.*memory_save$/;
 const cli = () => join(HARNESS, 'narvai.mjs').replace(/\\/g, '/');
+// Detached from the session, so a slow build never holds a tool call up.
+const background = (args, cwd) => spawn(process.execPath, [cli(), ...args], { cwd, detached: true, stdio: 'ignore', windowsHide: true }).unref();
 
 export const allowPath = () => join(home(), '.narvai', 'allow.json');
 // A file that does not parse counts as empty, so one broken file never switches the other rules off.
@@ -87,12 +90,14 @@ function main() {
     const text = sessionContext(n);
     if (text) {
       reply({ additionalContext: text });
-      // Graphs follow the working tree: a stale one is rebuilt in the background, detached from this session.
-      spawn(process.execPath, [cli(), 'graph', 'refresh'], { cwd: n.cwd, detached: true, stdio: 'ignore', windowsHide: true }).unref();
+      // Graphs follow the working tree and the shared memory: a stale one is rebuilt in the background.
+      background(['graph', 'refresh'], n.cwd);
     }
   } else if (n.event === 'PreToolUse') {
     const r = denied(n, rules(), exceptions());
     if (r) return reply({ permissionDecision: 'deny', permissionDecisionReason: `${r.reason} Instead: ${r.instead}${r.fixed ? '' : ` Only the user can grant an exception, in their own terminal: narvai allow ${r.id}`}` });
+    // A record is about to be saved: the memory graph follows once it has landed.
+    if (SAVE.test(n.tool)) background(['graph', 'memory', '--wait', '10'], n.cwd);
     const text = editContext(n);
     if (text) reply({ additionalContext: text });
   }

@@ -109,7 +109,7 @@ Rota eklemek ya da değiştirmek için `registry/routes.json` dosyasını düzen
 Bir projenin kendi tasarım skill'i varsa store'daki `project-profile.md` dosyasına şu satırı yaz; UI rotası ve hook onu adıyla gösterir:
 
 ```
-Design skill: `omnimind-ui`
+Design skill: `shop-ui`
 ```
 
 ## Kod graph'ları
@@ -169,6 +169,41 @@ Bir kaydı kimin yazdığını görmek için kayıt biçimine bir `by` alanı ek
 
 Alanı ajan kendisi yazar; hook yalnız var olup olmadığına bakar, doğruluğunu denetlemez.
 
+### Hafıza graph'ı
+
+AgentMemory kendi graph'ını yalnız oturum gözlemlerinden doldurur; `memory_save` ile yazılan kayıtlar oraya girmez. narvai graph'ı kayıtlardan üretir ve içeri alır. Model çağrılmaz.
+
+| İş | Komut |
+|---|---|
+| Graph'ı kayıtlarla eşitlemek | `narvai graph memory` |
+| Sıfırlayıp baştan kurmak | `narvai graph memory --reset` |
+| AgentMemory'nin graph index'ini ilk kez açmak | `narvai graph memory --migrate` (`narvai setup` bunu yapar) |
+| Güncel mi | `narvai graph status` (son satır) |
+| Görmek | AgentMemory viewer, `http://localhost:3113/#graph` |
+
+Elle çalıştırman gerekmez. Hook aynı eşitlemeyi oturum başında ve bir kayıt yazıldıktan on saniye sonra arka planda başlatır. Yeni bir şey yoksa durur. Yalnız ekleme varsa üstüne ekler. Bir node ya da ilişki kalktıysa graph'ı sıfırlar ve baştan içeri alır. 190 node ve 620 ilişki yaklaşık bir dakika sürer.
+
+Proje ayarı olmadan graph'ta her güncel kayıt, kaydın etiketleri (`concepts`) ve `source` alanındaki dosyalar yer alır. Daha fazlası için `<store>/graph/memory/<memoryProject>.json` dosyasını yaz:
+
+```json
+{
+  "decisions": { "file": "C:/.../00-kararlar.md", "label": "Karar", "settled": "Kesin" },
+  "skipTags": "^by-",
+  "entities": {
+    "Catalog": ["catalog"],
+    "SG": ["=sg"],
+    "trend": ["^trend"],
+    "iş panosu": ["iş pano", "=pano"]
+  },
+  "relations": [["iş panosu", "uses", "TaskInbox"]]
+}
+```
+
+- `decisions.file`: ilk sütunu `#` olan bir markdown tablosu; sütunlar numara, konu, karar, durum. Her satır bir karar node'u olur. `settled` dışındaki durum adın sonuna yazılır. Bir kayıt "karar 12" ya da "kararlar 12, 19" diye geçirirse o kararlara bağlanır.
+- `entities`: ad ve aranacak yazımlar. Yazımlar küçük harfle yazılır. `=sg` tam sözcük, `^trend` sözcük başı, diğerleri düz kalıptır. Yazımı geçen her kayıt ve karar o ada bağlanır.
+- `relations`: adlar arasında elle yazılan ilişki; tür `uses`, `depends_on` ya da `related_to`.
+- `skipTags`: graph'a girmeyecek etiketlerin kalıbı.
+
 ## Sağlık kontrolü ve sorun giderme
 
 `narvai doctor` kurulumu, kural dosyalarının boyutunu, rotaları, guard kurallarını, hafızayı ve graph'ları denetler. `narvai doctor --fix`, `sync` ile düzelebilenleri düzeltir.
@@ -182,6 +217,7 @@ Alanı ajan kendisi yazar; hook yalnız var olup olmadığına bakar, doğruluğ
 | Push'ta `narvai verify failed` | Hatayı düzelt. Riski kabul ediyorsan `git push --no-verify` |
 | lefthook ya da husky hook dosyalarını yeniden yazdı | `narvai hooks <repo>` |
 | Graph hep bayat görünüyor | `narvai graph build --only <repo> --worktree`; günlük için komutu elle çalıştırıp çıktıya bak |
+| Hafıza graph'ı boş ya da bayat | `narvai graph memory`; çıktı index'in açılmadığını söylüyorsa `narvai graph memory --migrate` |
 | Skill listesi Codex sınırını aşıyor | `registry/routes.json` içindeki `listed` ve profillerdeki `skills` listelerinden çıkar, `narvai sync` |
 
 ## Davranış testi (eval)
@@ -209,6 +245,8 @@ Alanı ajan kendisi yazar; hook yalnız var olup olmadığına bakar, doğruluğ
    | Çalıştırmadan listelemek | `narvai eval --dry-run` |
    | Kayıtlı bir koşuyu yeniden puanlamak | `narvai eval --rejudge=<koşu klasörü>` |
 
+Repodaki `evals/scenarios.json`, yazıldığı iki reponun dosyalarını sorar. Başka repolar için kendi senaryolarını `<store>/dev-harness/evals/scenarios.json` dosyasına yaz; varsa `narvai eval` onu kullanır.
+
 Kayıtlar `<store>/dev-harness/evals/<zaman>/` altında durur: senaryo başına transkript ve `results.json`. Koşular aboneliği kullanır; bir API anahtarı tanımlıysa eval çalışmayı reddeder.
 
 ## Harness'ı güncellemek
@@ -220,6 +258,25 @@ narvai doctor
 ```
 
 Bu repoda değişiklik yaptıysan önce `node --test tests/*.test.mjs` koştur. Vendored bir skill setini güncelleme adımları `README.md` sonunda.
+
+## Başka bir makineye kurmak
+
+Kurulumun tamamı bu repodan ve içindeki komutlardan gelir. Repoda olmayan üç şey sana aittir; eski makineden kopyalarsın ya da boş başlarsın:
+
+| Ne | Nerede | Yoksa |
+|---|---|---|
+| Kişisel kurallar ve yasakların kaynağı | `~/.narvai/rules.md`, `~/.narvai/guard.rules.mjs` | Yalnız `rules/core.md` ve repodaki yasaklar geçerli olur |
+| Store | `<kök>/Features/_harness` | `map.json` boş başlar; proje kuralı, kontrol ayarı ve graph yoktur |
+| Ortak hafızanın verisi | `<kök>/Memory/agentmemory` | Hafıza boş başlar |
+
+1. Node 22, git ve kullandığın ajanları kur: Claude Code, Codex.
+2. Ortak hafıza için `npm install -g @agentmemory/agentmemory@0.9.33`. Kod graph'ları için `uv tool install graphifyy` ve `~/.understand-anything-plugin` altında Understand-Anything plugin'inin bir kopyası.
+3. Repoyu klonla ve `node narvai.mjs setup --root <kök>` çalıştır. setup önce `install` yapar, sonra bulduğunu ayarlar: AgentMemory'nin ayarları, Windows'ta yeniden başlatma görevi, her ajandaki MCP kaydı ve graph index'i; ardından Hermes, Codex ve Orca. Sonunda elle yapılacakları listeler.
+4. Yasak kuralı getirdiysen `narvai guard apply`, sonra `narvai doctor`.
+5. Codex'te `/hooks` aç ve narvai girdilerine güven ver.
+6. Her repo için "Yeni bir repo eklemek" adımları.
+
+`setup` ve `install` yeniden çalıştırılabilir. Yollar `~/.narvai/config.json` dosyasından okunur.
 
 ## Dosyalar nerede
 
@@ -233,4 +290,6 @@ Bu repoda değişiklik yaptıysan önce `node --test tests/*.test.mjs` koştur. 
 | Repo ile store eşlemesi | `<store>/map.json` |
 | Proje kuralları, kontroller, iş durumu | `<store>/<proje>/project-rules.md`, `verify.json`, `work/<id>/` |
 | Graph'lar | `<store>/graph/` |
+| Hafıza graph'ının proje ayarı | `<store>/graph/memory/<memoryProject>.json` |
+| Son içeri alınan hafıza graph'ı | `~/.agentmemory/graph-import/<memoryProject>.json` |
 | Eval kayıtları | `<store>/dev-harness/evals/` |

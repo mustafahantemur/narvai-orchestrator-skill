@@ -14,7 +14,7 @@ Stack profiles exist for .NET and Next.js. Another stack is one folder.
 
    ```
    $ narvai next --event edit --paths src/features/orders/order-list.tsx
-   omnimind-ui  <repo>/.claude/skills/omnimind-ui/SKILL.md  UI work
+   shop-ui  <repo>/.claude/skills/shop-ui/SKILL.md  UI work
    impeccable  .../third-party/skills/impeccable/SKILL.md
    vercel-react-best-practices  .../SKILL.md  React component or data fetching change
    ```
@@ -51,6 +51,24 @@ sync leaves a rule file alone if narvai did not generate it. Pass `--adopt` to t
 
 For each repository, add its path and a store folder to `<storeRoot>/map.json`. `narvai hooks <repo>` adds two git hooks: the checks before a push, and a note at commit that lists changed sources whose tests were not touched.
 
+### A new machine
+
+The whole setup comes from this repository and the commands in it. Three things are yours and live outside it. Copy them from the old machine or start empty.
+
+| What | Where | When it is missing |
+|---|---|---|
+| Your rules and deny rules | `~/.narvai/rules.md`, `~/.narvai/guard.rules.mjs` | Only `rules/core.md` and the shipped deny rules apply. |
+| The store | `<root>/Features/_harness` | `map.json` starts empty. There are no project rules, check overrides or graphs yet. |
+| Shared memory data | `<root>/Memory/agentmemory` | The memory starts empty. |
+
+1. Install Node 22, git and the agents you use, Claude Code and Codex.
+2. Install the shared memory with `npm install -g @agentmemory/agentmemory@0.9.33`. Code graphs need `uv tool install graphifyy` and a copy of the Understand-Anything plugin in `~/.understand-anything-plugin`.
+3. Clone this repository and run `node narvai.mjs setup --root <root>`. setup runs `install`, then configures what it finds: AgentMemory with its settings, its restart task on Windows, its MCP entry in each agent and its graph index, then Hermes, Codex and Orca. It ends with a list of what is left to do by hand.
+4. Run `narvai guard apply` if you brought deny rules, then `narvai doctor`.
+5. In Codex, open `/hooks` and trust the narvai entries.
+
+`setup` and `install` are safe to run again. Paths come from `~/.narvai/config.json`, and the code names no machine, user or project. One file does: `evals/scenarios.json` asks about files of the two repositories it was written against. Put your own scenarios in `<storeRoot>/dev-harness/evals/scenarios.json` and `narvai eval` uses those.
+
 ## Commands
 
 ```
@@ -61,6 +79,7 @@ narvai tests [--failed <file>]               changed sources whose tests were no
 narvai contract                              the steps when an endpoint, DTO or enum changes
 narvai skill <name> | --list                 where a skill is and which routes use it
 narvai graph <status|build|refresh>          code graphs kept in the store
+narvai graph memory [--reset] [--migrate]    the knowledge graph of the shared memory, built from its records
 narvai doctor [--fix]                        what is installed, what is broken, what is too large
 narvai sync                                  regenerate rule files, links, agent profiles and the hook
 narvai eval [--only=a,b] [--rejudge=<dir>]   behaviour scenarios through headless Claude Code
@@ -80,6 +99,7 @@ narvai guard [apply [<file>]]                list the deny rules, or put your ow
 | `~/.narvai/config.json` | Store location, eval worktrees, the shared memory endpoint and its restart command. |
 | `<store>/<project>/project-rules.md` | Project rules. A first line `include: <path>` pulls in a file shared by several repositories. |
 | `<store>/<project>/verify.json` | Replaces the profile's checks for that repository. |
+| `<store>/graph/memory/<memoryProject>.json` | Optional. A decision table, entity names and relations for the memory graph. |
 
 Order of precedence: your rules, the project's rule files, `rules/core.md`, then any skill. A skill never overrides a rule. If a skill says to commit or to write tests first, the rules decide.
 
@@ -116,6 +136,17 @@ If `config.json` has a `memory` entry, `narvai context` checks that the endpoint
 ```
 
 When the endpoint does not answer, narvai runs the `start` command and waits up to 25 seconds. The output says `memory: reachable`, or tells the agent to stop and inform you. `narvai doctor` fails on an unreachable memory. On Windows, `narvai setup` registers AgentMemory as a task that runs at logon and every 15 minutes, and restarts the server only when it is down.
+
+### The memory graph
+
+AgentMemory fills its knowledge graph from session observations. A record saved with `memory_save` never reaches it, so the graph stays empty when agents only save records. narvai builds the graph from the records and imports it. No model is called.
+
+- Every current record becomes a node, linked to its concept tags and to the files its `source` names.
+- A project file adds more. `<storeRoot>/graph/memory/<memoryProject>.json` can name a markdown decision table, entities with the spellings to look for, and relations between entities. Each decision row and each entity becomes a node, linked to the records and decisions that mention it. `KULLANIM.md` has an example.
+
+`narvai graph memory` brings the graph in line with the records. The hook starts the same sync in the background at session start and ten seconds after a record is saved. A sync that finds nothing new stops. Additions are imported on top. When a node or a relation has gone, the graph is reset and imported whole. `narvai graph status` shows whether the graph is current. AgentMemory's viewer shows it, on port 3113 by default.
+
+AgentMemory asks before it indexes an existing graph store. `narvai graph memory --migrate` gives that go-ahead once, and `narvai setup` runs it.
 
 ## Code graphs
 

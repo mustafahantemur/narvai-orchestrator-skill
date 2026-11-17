@@ -185,7 +185,10 @@ function report(rows) {
 
 export default async function run(args) {
   const conf = cfg();
-  const spec = JSON.parse(readFileSync(join(HARNESS, 'evals', 'scenarios.json'), 'utf8'));
+  const evals = join(conf.storeRoot ?? join(home(), '.narvai'), 'dev-harness', 'evals');
+  // The shipped scenarios name files of two particular repositories; your own, in the store, replace them.
+  const own = join(evals, 'scenarios.json');
+  const spec = JSON.parse(readFileSync(existsSync(own) ? own : join(HARNESS, 'evals', 'scenarios.json'), 'utf8'));
   const opt = (k) => args.find((a) => a.startsWith(`--${k}=`))?.split('=')[1];
   if (opt('rejudge')) {
     const rows = rejudge(opt('rejudge'), spec, conf.evalRepos ?? {});
@@ -206,7 +209,7 @@ export default async function run(args) {
   const risk = keyRisk(Object.values(repos));
   if (risk.length) { console.error(`refusing to run: an API key or provider account could be used (${risk.join(', ')}). Evals run on the subscription login only.`); process.exit(1); }
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const dir = join(conf.storeRoot ?? join(home(), '.narvai'), 'dev-harness', 'evals', stamp);
+  const dir = join(evals, stamp);
   mkdirSync(dir, { recursive: true });
   // Each lane rewrites the results file after every scenario, so an interrupted run keeps what it finished.
   const done = {};
