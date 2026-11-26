@@ -94,18 +94,18 @@ export default async function run(argv) {
       if (!existsSync(amEnv)) sh('agentmemory', ['init']);
       return upsertEnv(amEnv, { EMBEDDING_PROVIDER: 'local', AGENTMEMORY_TOOLS: 'core', AGENTMEMORY_DATA_DIR: native(`${root}/Memory/agentmemory`), AGENT_ID: MEMORY_AGENT_ID });
     });
-    // The task is also a watchdog: at logon and every 15 minutes it leaves a live server alone and restarts a dead one.
-    // (Seen 2026-11-16: after an engine reconnect the http worker did not come back and the server stayed down for hours.)
-    if (WIN) step('watchdog task "AgentMemory (unified-harness)"', () => {
+    // The task runs at logon and is what config.memory.start runs when the endpoint is down: it leaves a live server
+    // alone and restarts a dead one. conhost --headless keeps it off the screen; -WindowStyle Hidden shows a window first.
+    if (WIN) step('task "AgentMemory (unified-harness)"', () => {
       const xml = sh('schtasks', ['/query', '/tn', 'AgentMemory (unified-harness)', '/xml'], { allowFail: true, readOnly: true });
-      if (xml.status === 0 && String(xml.stdout).includes('livez')) return 'exists';
+      if (xml.status === 0 && String(xml.stdout).includes('livez') && String(xml.stdout).includes('--headless')) return 'exists';
       const am = which('agentmemory.cmd') ?? which('agentmemory');
       const run = `try { if ((Invoke-WebRequest '${AGENTMEMORY_URL.replace('localhost', '127.0.0.1')}/agentmemory/livez' -UseBasicParsing -TimeoutSec 5).StatusCode -eq 200) { exit 0 } } catch {}; & '${am}' stop *> \`$null; & '${am}' *> '${join(HOME, '.agentmemory', 'server.log')}'`;
-      const ps = `$a=New-ScheduledTaskAction -Execute (Get-Command pwsh,powershell -ErrorAction SilentlyContinue | Select-Object -First 1).Source -Argument "-NoProfile -WindowStyle Hidden -Command ${run}";`
+      const ps = `$p=(Get-Command pwsh,powershell -ErrorAction SilentlyContinue | Select-Object -First 1).Source;`
+        + `$a=New-ScheduledTaskAction -Execute conhost.exe -Argument "--headless ""$p"" -NoProfile -Command ""${run}""";`
         + `$t=New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\\$env:USERNAME";`
-        + `$r=New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 15);`
         + `$s=New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10);`
-        + `Register-ScheduledTask -TaskName 'AgentMemory (unified-harness)' -Action $a -Trigger $t,$r -Settings $s -Force | Out-Null`;
+        + `Register-ScheduledTask -TaskName 'AgentMemory (unified-harness)' -Action $a -Trigger $t -Settings $s -Force | Out-Null`;
       sh('powershell', ['-NoProfile', '-Command', ps]);
       return xml.status === 0 ? 'updated' : 'created';
     });

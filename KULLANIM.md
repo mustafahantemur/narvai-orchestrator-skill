@@ -125,7 +125,7 @@ Graph'lar `<store>/graph/` altında durur, repoya bir şey yazılmaz. Hangi repo
 | Yalnız birleşik graph'ı yenilemek | `narvai graph build --merge` |
 | Bayatsa yenilemek, değilse bir şey yapmamak | `narvai graph refresh` (30 dakika beklemeden: `--now`) |
 
-Oturum başında hook, bulunduğun repo için `narvai graph refresh` komutunu arka planda başlatır. Graph bayatsa ve son kurulumun üstünden 30 dakika geçtiyse yeniden kurulur. Süreyi `config.json` içindeki `graphMinutes` belirler. Ölçülen süreler: frontend (1.900 dosya) 167 sn; Core'da (6.000 dosya) yalnız Graphify adımı 352 sn.
+Hiçbir hook kod graph'ını kurmaz, çünkü kurulum dakikalarca CPU kullanır. `narvai graph refresh`, bulunduğun repo için graph bayatsa ve son kurulumun üstünden 30 dakika geçtiyse yeniden kurar. Süreyi `config.json` içindeki `graphMinutes` belirler. Ölçülen süreler: frontend (1.900 dosya) 167 sn; Core'da (6.000 dosya) yalnız Graphify adımı 352 sn.
 
 `narvai graph status` çıktısındaki durumlar:
 
@@ -155,7 +155,7 @@ Sayfa o klasörün `graphify-out/graph.html` dosyasıdır. Bütün bir büyük r
 | Elle yeniden başlatmak (Windows) | `agentmemory stop`, sonra `schtasks /run /tn "AgentMemory (unified-harness)"` |
 | Kontrol | `narvai doctor` ("shared memory reachable") |
 
-Windows'ta zamanlanmış görev oturum açılışında ve her 15 dakikada bir çalışır; sunucu ayaktaysa dokunmaz, kapalıysa yeniden başlatır. Sunucunun günlüğü `~/.agentmemory/compose-3111.log` dosyasıdır.
+Windows'ta zamanlanmış görev oturum açılışında, pencere açmadan çalışır; sunucu ayaktaysa dokunmaz, kapalıysa yeniden başlatır. Sunucunun günlüğü `~/.agentmemory/compose-3111.log` dosyasıdır.
 
 Bir kaydı kimin yazdığını görmek için kayıt biçimine bir `by` alanı ekleyebilirsin: `| by: <harness>/<model>/<efor>`, örneğin `| by: claude-code/claude-opus-5-5/high`. Bunu zorunlu kılan kural senin yasak kurallarına yazılır; `by` taşımayan kaydı hook reddeder:
 
