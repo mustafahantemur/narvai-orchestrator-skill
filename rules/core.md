@@ -52,5 +52,6 @@ Stop at the first step that holds:
 ## Keep the context small
 
 - Read what the task needs, not the repository. Prefer a search to opening files one by one.
+- With Code Mode on, run independent searches, reads and checks in one script and return only the lines you need: never whole files, logs or test output.
 - Do the work yourself unless a part is independent and bulky enough to pay for a fresh agent. Never one agent per file. To another agent, report findings, paths and numbers: no preamble, no restating the task.
 - Nothing that belongs to the harness is written into a project repository: plans, state, graphs and notes live in the store that `narvai context` names.

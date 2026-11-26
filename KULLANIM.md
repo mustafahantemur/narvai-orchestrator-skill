@@ -204,6 +204,21 @@ Proje ayarı olmadan graph'ta her güncel kayıt, kaydın etiketleri (`concepts`
 - `relations`: adlar arasında elle yazılan ilişki; tür `uses`, `depends_on` ya da `related_to`.
 - `skipTags`: graph'a girmeyecek etiketlerin kalıbı.
 
+## Code Mode (Claude Code)
+
+Claude Code'un deneysel Code Mode'u araç çağrılarını tek bir JavaScript betiğinde toplar: aramalar ve komutlar paralel koşar,
+bir sonucun gereken kısmı bir sonrakine geçer, Claude yalnız gereken satırları okur. Arka arkaya çok arama, okuma ya da kontrol
+gereken işte context ve token tasarrufu sağlar.
+
+- `narvai sync`, `~/.claude/settings.json` içine `"env": { "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "1" }` yazar; değer zaten
+  varsa dokunmaz. Kapatmak için değeri `"0"` yap; sync onu bırakır.
+- Claude Code v2.1.323 ya da sonrası gerekir. İlk açılışta onay sorar ve yeniden başlar. VS Code paneli, Desktop ve bulut
+  oturumlarında çalışmaz; terminalde (Orca dahil) çalışır.
+- Guard bozulmaz: betikten yapılan her Bash, Edit, Write ve MCP çağrısı `PreToolUse` hook'undan kendi adıyla geçer; yasak
+  kuralları birleşik komutları (`cd x && git push`) da yakalar.
+- Review ajanı (`narvai-gozden-gecir`) betik yazabilir (`REPL`). Keşif ajanı salt okunur kaldığı için eklenmedi.
+- `narvai doctor` durumu gösterir.
+
 ## Sağlık kontrolü ve sorun giderme
 
 `narvai doctor` kurulumu, kural dosyalarının boyutunu, rotaları, guard kurallarını, hafızayı ve graph'ları denetler. `narvai doctor --fix`, `sync` ile düzelebilenleri düzeltir.
