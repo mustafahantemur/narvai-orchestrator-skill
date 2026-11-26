@@ -96,8 +96,8 @@ function build(args) {
   } finally { rmSync(held, { force: true }); }
 }
 
-// Called in the background at session start: rebuild this repository's graphs from the working tree when they are stale,
-// but not more often than every graphMinutes (default 30), so a busy day does not rebuild on every session.
+// Rebuild this repository's graphs from the working tree when they are stale, but not more often than every
+// graphMinutes (default 30) unless --now is given.
 function refreshCode(args) {
   const list = readJson(join(graphDir(), 'repos.json'), { repos: [] });
   const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : graphRepoFor(process.cwd(), list);
@@ -110,8 +110,7 @@ function refreshCode(args) {
   build(['--only', only, '--worktree', '--no-fetch']);
 }
 
-// What the hook starts in the background at session start: the knowledge graph of the shared memory, then this
-// repository's code graphs.
+// On request only, never from a hook: the knowledge graph of the shared memory, then this repository's code graphs.
 async function refresh(args) {
   const line = await memoryGraph();
   if (line) console.log(line);

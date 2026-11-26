@@ -135,7 +135,7 @@ If `config.json` has a `memory` entry, `narvai context` checks that the endpoint
 "memory": { "url": "http://127.0.0.1:3111/agentmemory/livez", "start": "schtasks /run /tn \"AgentMemory (unified-harness)\"" }
 ```
 
-When the endpoint does not answer, narvai runs the `start` command and waits up to 25 seconds. The output says `memory: reachable`, or tells the agent to stop and inform you. `narvai doctor` fails on an unreachable memory. On Windows, `narvai setup` registers AgentMemory as a task that runs at logon and every 15 minutes, and restarts the server only when it is down.
+When the endpoint does not answer, narvai runs the `start` command and waits up to 25 seconds. The output says `memory: reachable`, or tells the agent to stop and inform you. `narvai doctor` fails on an unreachable memory. On Windows, `narvai setup` registers AgentMemory as a task that runs at logon, without a window, and restarts the server only when it is down. The `start` command runs the same task.
 
 ### The memory graph
 
@@ -152,7 +152,7 @@ AgentMemory asks before it indexes an existing graph store. `narvai graph memory
 
 narvai keeps two graphs per repository in `<storeRoot>/graph/`, never in the repository: a Graphify graph and Understand-Anything graphs per module. A script builds both without calling a model. `<storeRoot>/graph/repos.json` lists the repositories.
 
-A graph is current when it matches the repository's working tree, uncommitted and untracked files included. `narvai graph status` shows each one. At session start the hook starts `narvai graph refresh` in the background. It rebuilds a stale graph of the repository you are in, at most once every 30 minutes (`graphMinutes` in the config). `narvai graph build --only <repo> --worktree` rebuilds at once.
+A graph is current when it matches the repository's working tree, uncommitted and untracked files included. `narvai graph status` shows each one. No hook builds a code graph, because a build takes minutes of CPU. `narvai graph refresh` rebuilds a stale graph of the repository you are in, at most once every 30 minutes (`graphMinutes` in the config, `--now` skips the wait). `narvai graph build --only <repo> --worktree` rebuilds at once.
 
 Graphs are optional for the agent. Measured on a 6,000-file repository with nine questions, an agent that used a graph answered no more accurately than one that used search alone, and it took more turns. Use the graphs to look at an area yourself. `skills/narvai-orchestrator/references/graphs.md` says when a query is worth it.
 

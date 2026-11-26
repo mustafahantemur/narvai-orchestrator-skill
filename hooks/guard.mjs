@@ -11,7 +11,8 @@ const SHELL = /^(?:Bash|PowerShell)$/;
 const EDIT = /^(?:Edit|Write|MultiEdit|NotebookEdit|apply_patch)$/;
 const SAVE = /agentmemory.*memory_save$/;
 const cli = () => join(HARNESS, 'narvai.mjs').replace(/\\/g, '/');
-// Detached from the session, so a slow build never holds a tool call up.
+// Detached from the session, so a slow sync never holds a tool call up. On Windows a detached process has no console,
+// so a console program it starts opens a window on the user's screen: what runs here must start none.
 const background = (args, cwd) => spawn(process.execPath, [cli(), ...args], { cwd, detached: true, stdio: 'ignore', windowsHide: true }).unref();
 
 export const allowPath = () => join(home(), '.narvai', 'allow.json');
@@ -90,8 +91,8 @@ function main() {
     const text = sessionContext(n);
     if (text) {
       reply({ additionalContext: text });
-      // Graphs follow the working tree and the shared memory: a stale one is rebuilt in the background.
-      background(['graph', 'refresh'], n.cwd);
+      // The memory graph follows the shared memory. Code graphs are built on request only: a build is minutes of CPU.
+      background(['graph', 'memory'], n.cwd);
     }
   } else if (n.event === 'PreToolUse') {
     const r = denied(n, rules(), exceptions());
