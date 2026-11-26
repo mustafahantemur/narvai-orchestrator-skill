@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { cfg, cfgPath, HARNESS, home, memory, readJson, sameDir, skillTargets, tilde, which } from './ortak.mjs';
 import { rules as guardRules } from '../hooks/guard.mjs';
+import { CODE_MODE } from '../hooks/register.mjs';
 import { graphRows } from './graph.mjs';
 import { lastChangeLine } from './guard.mjs';
 import runSync from './sync.mjs';
@@ -175,6 +176,11 @@ function hooks() {
   const claude = hookCommands(claudeSettings());
   for (const [f, re] of wanted) rows.push(claude.some((c) => re.test(c)) ? ok(`Claude hook ${f} registered`) : fail(`Claude hook ${f} not registered  (run sync)`, true));
   if (claude.some((c) => c.includes('ai-store-context'))) rows.push(warn('old PowerShell store hook still registered  (run sync)', true));
+  if (existsSync(join(home(), '.claude'))) {
+    const mode = readJson(claudeSettings(), {}).env?.[CODE_MODE];
+    rows.push(mode === '1' ? ok('Claude Code Mode on') : mode === '0' ? warn('Claude Code Mode turned off by you (env 0); sync leaves it')
+      : warn('Claude Code Mode not set  (run sync)', true));
+  }
   if (guard && existsSync(join(home(), '.codex'))) {
     const codex = hookCommands(codexHooks());
     rows.push(codex.some((c) => /[\\/]guard\.mjs/.test(c)) ? ok('Codex hook guard.mjs registered') : warn('Codex hook guard.mjs not registered  (run sync)', true));

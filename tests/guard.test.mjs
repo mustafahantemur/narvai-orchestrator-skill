@@ -83,6 +83,7 @@ test('registration replaces old narvai entries, keeps others, is idempotent', ()
   }
   const c = readJson(claudeFile);
   assert.equal(c.model, 'x');
+  assert.equal(c.env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, '1');
   assert.equal(c.hooks.UserPromptSubmit, undefined);
   assert.deepEqual(c.hooks.SessionStart.map((e) => e.hooks[0].command.split(' ')[0]), ['orca.exe', 'node']);
   assert.deepEqual(c.hooks.PreToolUse.map((e) => e.hooks[0].command.split(' ')[0]), ['orca.exe', 'node']);
@@ -90,5 +91,24 @@ test('registration replaces old narvai entries, keeps others, is idempotent', ()
   const x = readJson(codexFile);
   assert.equal(x.hooks.PreToolUse[0].hooks[0].command, 'codex-hook.cmd');
   assert.match(x.hooks.PreToolUse[1].hooks[0].command, /hooks\/guard\.mjs" codex$/);
+  assert.equal(x.env, undefined);
   assert.equal(readdirSync(join(home, '.narvai', 'backups')).length, 2);
+});
+
+test('registration keeps a Claude Code Mode the user turned off', () => {
+  const home = mkdtempSync(join(tmpdir(), 'narvai-codemode-'));
+  const was = process.env.NARVAI_HOME;
+  process.env.NARVAI_HOME = home;
+  mkdirSync(join(home, '.claude'));
+  const claudeFile = join(home, '.claude', 'settings.json');
+  writeFileSync(claudeFile, JSON.stringify({ env: { CLAUDE_CODE_EXPERIMENTAL_CODE_MODE: '0' } }));
+  const log = console.log;
+  console.log = () => {};
+  try {
+    registerHooks({ home });
+  } finally {
+    console.log = log;
+    if (was === undefined) delete process.env.NARVAI_HOME; else process.env.NARVAI_HOME = was;
+  }
+  assert.equal(readJson(claudeFile).env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE, '0');
 });

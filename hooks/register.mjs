@@ -5,6 +5,9 @@ import { backup, HARNESS } from '../cli/ortak.mjs';
 // Ours: the old hook files by name, and guard.mjs only in the form this file writes (path, then the harness name).
 const OURS = /ai-store-context|store-context\.mjs|narvai-guard\.mjs|ua-auto-update\.mjs|hooks[\\/]guard\.mjs"? (?:claude|codex)\s*$/;
 export const TOOL_MATCHER = '^(?:Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit|apply_patch|mcp__.*)$';
+// Claude Code Mode (v2.1.323+): tool calls batched in one script, only the needed part read back. Calls made from the
+// script still pass PreToolUse under their usual names, so the guard keeps working. A user's explicit "0" is kept.
+export const CODE_MODE = 'CLAUDE_CODE_EXPERIMENTAL_CODE_MODE';
 
 function merge(file, h) {
   const s = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
@@ -17,6 +20,7 @@ function merge(file, h) {
   }
   (s.hooks.PreToolUse ??= []).push({ matcher: TOOL_MATCHER, hooks: [{ type: 'command', command, timeout: 10 }] });
   (s.hooks.SessionStart ??= []).push({ hooks: [{ type: 'command', command, timeout: 10 }] });
+  if (h === 'claude') (s.env ??= {})[CODE_MODE] ??= '1';
   if (JSON.stringify(s) === before) return false;
   backup(file);
   writeFileSync(file, JSON.stringify(s, null, 2) + '\n');
